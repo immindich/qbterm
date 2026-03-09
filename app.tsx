@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, memo } from "react";
 import { Box, Text, useInput, useApp, useStdout } from "ink";
-import { getMainData, type TorrentInfo } from "./api.js";
+import { getMainData, TransferInfo, type TorrentInfo } from "./api.js";
 
 function formatBytes(bytes: number): string {
     if (bytes === 0) return "0 B";
@@ -59,6 +59,15 @@ function TableHeader({ sort_column, sort_ascending }: { sort_column: number; sor
     )
 }
 
+function StatusBar({ dl_info_speed, dl_info_data, up_info_speed, up_info_data }: { dl_info_speed: number; dl_info_data: number; up_info_speed: number; up_info_data: number }) {
+    return (
+        <Box gap={1}>
+            <Text>Download Speed: {formatBytes(dl_info_speed)}/s</Text>
+            <Text>Upload Speed: {formatBytes(up_info_speed)}/s</Text>
+        </Box>
+    )
+}
+
 function Table({ torrents, selected_torrent, scrollOffset, maxRows, sort_column, sort_ascending, screenWidth }: { torrents: TorrentInfo[], selected_torrent: string | null, scrollOffset: number, maxRows: number, sort_column: number, sort_ascending: boolean, screenWidth: number }) {
     const visible = maxRows > 0 ? torrents.slice(scrollOffset, scrollOffset + maxRows) : torrents;
 
@@ -87,7 +96,7 @@ function resortState(prev: TorrentState, overrides: Partial<Pick<TorrentState, "
         ? torrents_sorted.findIndex((t) => t.hash === selected_torrent)
         : 0;
 
-    return { torrents, torrents_sorted, selected_torrent, selected_torrent_index, sort_column, sort_ascending };
+    return { torrents, torrents_sorted, selected_torrent, selected_torrent_index, sort_column, sort_ascending, server_state: prev.server_state };
 }
 
 interface TorrentState {
@@ -97,6 +106,7 @@ interface TorrentState {
     selected_torrent_index: number;
     sort_column: number;
     sort_ascending: boolean;
+    server_state: TransferInfo;
 }
 
 export function App({ url, sid }: { url: string; sid: string }) {
@@ -176,6 +186,25 @@ export function App({ url, sid }: { url: string; sid: string }) {
                     }
                 }
 
+                const default_server_state: TransferInfo = {
+                    dl_info_speed: 0,
+                    dl_info_data: 0,
+                    up_info_speed: 0,
+                    up_info_data: 0,
+                    dl_rate_limit: 0,
+                    up_rate_limit: 0,
+                    dht_nodes: 0,
+                    connection_status: "disconnected",
+                    queueing: false,
+                    use_alt_speed_limits: false,
+                    refresh_interval: 1000,
+                };
+
+                const server_state: TransferInfo = {
+                    ...(prev?.server_state ?? default_server_state),
+                    ...data.server_state,
+                };
+
                 const base: TorrentState = prev ?? {
                     torrents,
                     torrents_sorted: [],
@@ -183,9 +212,10 @@ export function App({ url, sid }: { url: string; sid: string }) {
                     selected_torrent_index: 0,
                     sort_column: 0,
                     sort_ascending: true,
+                    server_state,
                 };
 
-                return resortState(base, { torrents });
+                return { ...resortState(base, { torrents }), server_state };
             });
         }
 
@@ -200,13 +230,14 @@ export function App({ url, sid }: { url: string; sid: string }) {
 
     const { stdout } = useStdout();
     const screenWidth = stdout.columns ?? 80;
-    const maxRows = (stdout.rows ?? 24) - 4;
+    const maxRows = (stdout.rows ?? 24) - 5;
 
     return (
         <Box width="100%" height="100%" flexDirection="column">
             <Table torrents={state.torrents_sorted} selected_torrent={state.selected_torrent} scrollOffset={scrollOffsetRef.current} sort_column={state.sort_column} sort_ascending={state.sort_ascending} maxRows={maxRows} screenWidth={screenWidth} />
             <Box flexGrow={1} />
             <Text>{"─".repeat(screenWidth)}</Text>
+            <StatusBar dl_info_speed={state.server_state?.dl_info_speed ?? 0} dl_info_data={state.server_state?.dl_info_data ?? 0} up_info_speed={state.server_state?.up_info_speed ?? 0} up_info_data={state.server_state?.up_info_data ?? 0} />
             <Text>↑↓ navigate  PgUp/PgDn page  Home/End jump  ←→ sort column  s toggle order  q quit</Text>
         </Box>
     );

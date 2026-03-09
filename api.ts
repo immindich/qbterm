@@ -21,12 +21,26 @@ export interface TorrentInfo {
     amount_left: number;
 }
 
+export interface TransferInfo {
+    dl_info_speed: number;
+    dl_info_data: number;
+    up_info_speed: number;
+    up_info_data: number;
+    dl_rate_limit: number;
+    up_rate_limit: number;
+    dht_nodes: number;
+    connection_status: string;
+    queueing: boolean;
+    use_alt_speed_limits: boolean;
+    refresh_interval: number;
+}
+
 export interface MainData {
     rid: number;
     full_update?: boolean;
     torrents?: Record<string, Partial<TorrentInfo>>;
     torrents_removed?: string[];
-    server_state?: Record<string, unknown>;
+    server_state?: Partial<TransferInfo>;
     categories?: Record<string, unknown>;
     categories_removed?: string[];
     tags?: string[];
