@@ -1,0 +1,4 @@
+[connection]
+url = "http://localhost:8080"
+username = "admin"
+password = "adminadmin"
