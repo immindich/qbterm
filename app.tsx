@@ -59,24 +59,13 @@ function TableHeader({ sort_column, sort_ascending }: { sort_column: number; sor
     )
 }
 
-function Table({ torrents, selected_torrent, selected_torrent_index, sort_column, sort_ascending, maxRows }: { torrents: TorrentInfo[], selected_torrent: string | null, selected_torrent_index: number, sort_column: number, sort_ascending: boolean, maxRows: number }) {
-    const scrollOffset = useRef(0);
-
-    if (maxRows > 0 && torrents.length > maxRows) {
-        if (selected_torrent_index < scrollOffset.current) {
-            scrollOffset.current = selected_torrent_index;
-        } else if (selected_torrent_index >= scrollOffset.current + maxRows) {
-            scrollOffset.current = selected_torrent_index - maxRows + 1;
-        }
-    } else {
-        scrollOffset.current = 0;
-    }
-
-    const visible = maxRows > 0 ? torrents.slice(scrollOffset.current, scrollOffset.current + maxRows) : torrents;
+function Table({ torrents, selected_torrent, scrollOffset, maxRows, sort_column, sort_ascending, screenWidth }: { torrents: TorrentInfo[], selected_torrent: string | null, scrollOffset: number, maxRows: number, sort_column: number, sort_ascending: boolean, screenWidth: number }) {
+    const visible = maxRows > 0 ? torrents.slice(scrollOffset, scrollOffset + maxRows) : torrents;
 
     return (
         <Box flexDirection="column">
             <TableHeader sort_column={sort_column} sort_ascending={sort_ascending} />
+            <Text>{"─".repeat(screenWidth)}</Text>
             {visible.map((torrent) => <TableRow torrent={torrent} key={torrent.hash} selected={torrent.hash === selected_torrent} />)}
         </Box>
     )
@@ -113,6 +102,7 @@ interface TorrentState {
 export function App({ url, sid }: { url: string; sid: string }) {
     const [state, setState] = useState<TorrentState | null>(null);
     const ridRef = useRef(0);
+    const scrollOffsetRef = useRef(0);
 
     const { exit } = useApp();
 
@@ -121,7 +111,8 @@ export function App({ url, sid }: { url: string; sid: string }) {
             exit();
         }
 
-        const delta = key.upArrow ? -1 : key.downArrow ? 1 : 0;
+        const isPage = key.pageUp || key.pageDown;
+        const delta = key.upArrow ? -1 : key.downArrow ? 1 : key.pageUp ? -maxRows : key.pageDown ? maxRows : key.home ? -Infinity : key.end ? Infinity : 0;
         if (delta !== 0) {
             setState((prev) => {
                 if (prev === null || prev.torrents_sorted.length === 0) {
@@ -129,7 +120,16 @@ export function App({ url, sid }: { url: string; sid: string }) {
                 }
 
                 const len = prev.torrents_sorted.length;
-                const new_index = (prev.selected_torrent_index + delta + len) % len;
+                const new_index = Math.max(0, Math.min(len - 1, prev.selected_torrent_index + delta));
+
+                if (isPage) {
+                    scrollOffsetRef.current = Math.max(0, Math.min(len - maxRows, scrollOffsetRef.current + delta));
+                } else if (new_index < scrollOffsetRef.current) {
+                    scrollOffsetRef.current = new_index;
+                } else if (new_index >= scrollOffsetRef.current + maxRows) {
+                    scrollOffsetRef.current = new_index - maxRows + 1;
+                }
+
                 return { ...prev, selected_torrent_index: new_index, selected_torrent: prev.torrents_sorted[new_index].hash };
             });
         }
@@ -199,11 +199,15 @@ export function App({ url, sid }: { url: string; sid: string }) {
     }
 
     const { stdout } = useStdout();
-    const maxRows = (stdout.rows ?? 24) - 1;
+    const screenWidth = stdout.columns ?? 80;
+    const maxRows = (stdout.rows ?? 24) - 4;
 
     return (
         <Box width="100%" height="100%" flexDirection="column">
-            <Table torrents={state.torrents_sorted} selected_torrent={state.selected_torrent} selected_torrent_index={state.selected_torrent_index} sort_column={state.sort_column} sort_ascending={state.sort_ascending} maxRows={maxRows} />
+            <Table torrents={state.torrents_sorted} selected_torrent={state.selected_torrent} scrollOffset={scrollOffsetRef.current} sort_column={state.sort_column} sort_ascending={state.sort_ascending} maxRows={maxRows} screenWidth={screenWidth} />
+            <Box flexGrow={1} />
+            <Text>{"─".repeat(screenWidth)}</Text>
+            <Text>↑↓ navigate  PgUp/PgDn page  Home/End jump  ←→ sort column  s toggle order  q quit</Text>
         </Box>
     );
 }
