@@ -29,7 +29,12 @@ const columns: Column[] = [
     { name: "Up Speed", key: "upspeed", width: 10, render: (t) => formatBytes(t.upspeed) + "/s", sort: null },
 ];
 
-const TableRow = memo(function TableRow({ torrent, selected }: { torrent: TorrentInfo, selected: boolean }) {
+interface TableRowProps {
+    torrent: TorrentInfo;
+    selected: boolean;
+}
+
+const TableRow = memo(function TableRow({ torrent, selected }: TableRowProps) {
     return (
         <Box gap={1}>
             <Box width={1}>
@@ -44,7 +49,12 @@ const TableRow = memo(function TableRow({ torrent, selected }: { torrent: Torren
     )
 });
 
-function TableHeader({ sort_column, sort_ascending }: { sort_column: number; sort_ascending: boolean }) {
+interface TableHeaderProps {
+    sort_column: number;
+    sort_ascending: boolean;
+}
+
+function TableHeader({ sort_column, sort_ascending }: TableHeaderProps) {
     return (
         <Box gap={1}>
             <Box width={1}>
@@ -59,7 +69,14 @@ function TableHeader({ sort_column, sort_ascending }: { sort_column: number; sor
     )
 }
 
-function StatusBar({ dl_info_speed, dl_info_data, up_info_speed, up_info_data }: { dl_info_speed: number; dl_info_data: number; up_info_speed: number; up_info_data: number }) {
+interface StatusBarProps {
+    dl_info_speed: number;
+    dl_info_data: number;
+    up_info_speed: number;
+    up_info_data: number;
+}
+
+function StatusBar({ dl_info_speed, dl_info_data, up_info_speed, up_info_data }: StatusBarProps) {
     return (
         <Box gap={1}>
             <Text>Download Speed: {formatBytes(dl_info_speed)}/s</Text>
@@ -68,7 +85,17 @@ function StatusBar({ dl_info_speed, dl_info_data, up_info_speed, up_info_data }:
     )
 }
 
-function Table({ torrents, selected_torrent, scrollOffset, maxRows, sort_column, sort_ascending, screenWidth }: { torrents: TorrentInfo[], selected_torrent: string | null, scrollOffset: number, maxRows: number, sort_column: number, sort_ascending: boolean, screenWidth: number }) {
+interface TableProps {
+    torrents: TorrentInfo[];
+    selected_torrent: string | null;
+    scrollOffset: number;
+    maxRows: number;
+    sort_column: number;
+    sort_ascending: boolean;
+    screenWidth: number;
+}
+
+function Table({ torrents, selected_torrent, scrollOffset, maxRows, sort_column, sort_ascending, screenWidth }: TableProps) {
     const visible = maxRows > 0 ? torrents.slice(scrollOffset, scrollOffset + maxRows) : torrents;
 
     return (
@@ -109,7 +136,12 @@ interface TorrentState {
     server_state: TransferInfo;
 }
 
-export function App({ url, sid }: { url: string; sid: string }) {
+interface AppProps {
+    url: string;
+    sid: string;
+}
+
+export function App({ url, sid }: AppProps) {
     const [state, setState] = useState<TorrentState | null>(null);
     const ridRef = useRef(0);
     const scrollOffsetRef = useRef(0);
