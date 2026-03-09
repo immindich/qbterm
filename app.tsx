@@ -76,6 +76,19 @@ export function App({ url, sid }: { url: string; sid: string }) {
         if (input === "q") {
             exit();
         }
+
+        const delta = key.upArrow ? -1 : key.downArrow ? 1 : 0;
+        if (delta !== 0) {
+            setState((prev) => {
+                if (prev === null || prev.torrents_sorted.length === 0) {
+                    return prev;
+                }
+
+                const len = prev.torrents_sorted.length;
+                const new_index = (prev.selected_torrent_index + delta + len) % len;
+                return { ...prev, selected_torrent_index: new_index, selected_torrent: prev.torrents_sorted[new_index].hash };
+            });
+        }
     });
 
     useEffect(() => {
