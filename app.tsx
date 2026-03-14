@@ -148,6 +148,7 @@ interface TorrentState {
 interface AppProps {
     url: string;
     sid: string;
+    defaultSavePath: string;
 }
 
 export function App({ url, sid }: AppProps) {

@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { parse } from "smol-toml";
 import { render, Text } from "ink";
-import { authenticate } from "./api.js";
+import { authenticate, getDefaultSavePath } from "./api.js";
 import { App } from "./app.js";
 import { Login } from "./login.js";
 
@@ -37,14 +37,20 @@ interface RootProps {
 }
 
 function Root({ defaultUrl, defaultUsername, defaultPassword }: RootProps) {
-    const [session, setSession] = useState<{ url: string; sid: string } | null>(null);
+    const [session, setSession] = useState<{ url: string; sid: string; defaultSavePath: string } | null>(null);
     const [autoLoginFailed, setAutoLoginFailed] = useState(false);
     const autoLogin = defaultUrl && defaultUsername && defaultPassword && !autoLoginFailed;
+
+    const handleLogin = (url: string, sid: string) => {
+        getDefaultSavePath(url, sid)
+            .then((defaultSavePath) => setSession({ url, sid, defaultSavePath }))
+            .catch(() => setSession({ url, sid, defaultSavePath: "" }));
+    };
 
     useEffect(() => {
         if (defaultUrl && defaultUsername && defaultPassword) {
             authenticate(defaultUrl, defaultUsername, defaultPassword)
-                .then((sid) => setSession({ url: defaultUrl, sid }))
+                .then((sid) => handleLogin(defaultUrl, sid))
                 .catch(() => setAutoLoginFailed(true));
         }
     }, []);
@@ -54,10 +60,10 @@ function Root({ defaultUrl, defaultUsername, defaultPassword }: RootProps) {
     }
 
     if (session === null) {
-        return <Login defaultUrl={defaultUrl} defaultUsername={defaultUsername} onLogin={(url, sid) => setSession({ url, sid })} />;
+        return <Login defaultUrl={defaultUrl} defaultUsername={defaultUsername} onLogin={handleLogin} />;
     }
 
-    return <App url={session.url} sid={session.sid} />;
+    return <App url={session.url} sid={session.sid} defaultSavePath={session.defaultSavePath} />;
 }
 
 const config = loadConfig();

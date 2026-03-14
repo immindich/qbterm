@@ -74,6 +74,21 @@ export async function authenticate(
     return match[1];
 }
 
+export async function getDefaultSavePath(
+    url: string,
+    sid: string,
+): Promise<string> {
+    const response = await fetch(`${url}/api/v2/app/defaultSavePath`, {
+        headers: { Cookie: `SID=${sid}` },
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to get default save path: HTTP ${response.status}`);
+    }
+
+    return response.text();
+}
+
 export async function getTorrents(
     url: string,
     sid: string,
