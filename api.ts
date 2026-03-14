@@ -108,6 +108,65 @@ export async function getTorrents(
     return response.json() as Promise<TorrentInfo[]>;
 }
 
+export interface AddTorrentOptions {
+    urls?: string[];
+    savepath?: string;
+    cookie?: string;
+    category?: string;
+    tags?: string[];
+    skip_checking?: boolean;
+    paused?: boolean;
+    root_folder?: boolean;
+    rename?: string;
+    upLimit?: number;
+    dlLimit?: number;
+    ratioLimit?: number;
+    seedingTimeLimit?: number;
+    autoTMM?: boolean;
+    sequentialDownload?: boolean;
+    firstLastPiecePrio?: boolean;
+}
+
+export async function addTorrents(
+    url: string,
+    sid: string,
+    options: AddTorrentOptions,
+): Promise<void> {
+    const form = new FormData();
+
+    if (options.urls) form.append("urls", options.urls.join("\n"));
+    if (options.savepath) form.append("savepath", options.savepath);
+    if (options.cookie) form.append("cookie", options.cookie);
+    if (options.category) form.append("category", options.category);
+    if (options.tags) form.append("tags", options.tags.join(","));
+    if (options.skip_checking !== undefined) form.append("skip_checking", String(options.skip_checking));
+    if (options.paused !== undefined) form.append("paused", String(options.paused));
+    if (options.root_folder !== undefined) form.append("root_folder", String(options.root_folder));
+    if (options.rename) form.append("rename", options.rename);
+    if (options.upLimit !== undefined) form.append("upLimit", String(options.upLimit));
+    if (options.dlLimit !== undefined) form.append("dlLimit", String(options.dlLimit));
+    if (options.ratioLimit !== undefined) form.append("ratioLimit", String(options.ratioLimit));
+    if (options.seedingTimeLimit !== undefined) form.append("seedingTimeLimit", String(options.seedingTimeLimit));
+    if (options.autoTMM !== undefined) form.append("autoTMM", String(options.autoTMM));
+    if (options.sequentialDownload !== undefined) form.append("sequentialDownload", String(options.sequentialDownload));
+    if (options.firstLastPiecePrio !== undefined) form.append("firstLastPiecePrio", String(options.firstLastPiecePrio));
+
+    const response = await fetch(`${url}/api/v2/torrents/add`, {
+        method: "POST",
+        headers: { Cookie: `SID=${sid}` },
+        body: form,
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to add torrent: HTTP ${response.status}`);
+    }
+
+    const text = await response.text();
+    if (text === "Fails.") {
+        throw new Error("Failed to add torrent");
+    }
+}
+
 export async function getMainData(
     url: string,
     sid: string,

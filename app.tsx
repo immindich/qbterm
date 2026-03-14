@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, memo } from "react";
 import { Box, Text, useInput, useApp, useStdout } from "ink";
-import { getMainData, TransferInfo, type TorrentInfo } from "./api.js";
+import { getMainData, addTorrents, TransferInfo, type TorrentInfo } from "./api.js";
+import { Form } from "./form.js";
 
 function useTerminalSize() {
     const { stdout } = useStdout();
@@ -155,6 +156,47 @@ function Table({ torrents, selected_torrent, scrollOffset, scrollX, maxRows, sor
     )
 }
 
+interface AddTorrentFormProps {
+    serverUrl: string;
+    sid: string;
+    defaultSavePath: string;
+    onClose: () => void;
+}
+
+function AddTorrentForm({ serverUrl, sid, defaultSavePath, onClose }: AddTorrentFormProps) {
+    const [url, setUrl] = useState("");
+    const [savePath, setSavePath] = useState(defaultSavePath);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    function handleSubmit() {
+        if (loading || !url.trim()) return;
+        setLoading(true);
+        setError(null);
+        addTorrents(serverUrl, sid, { urls: [url.trim()], savepath: savePath })
+            .then(() => onClose())
+            .catch((err) => {
+                setError(err instanceof Error ? err.message : String(err));
+                setLoading(false);
+            });
+    }
+
+    return (
+        <>
+            <Form
+                title="Add new torrent"
+                fields={[
+                    { label: "URL", value: url, onChange: setUrl },
+                    { label: "Save path", value: savePath, onChange: setSavePath },
+                ]}
+                onSubmit={handleSubmit}
+            />
+            {loading && <Text color="yellow">Adding torrent...</Text>}
+            {error && <Text color="red">{error}</Text>}
+        </>
+    );
+}
+
 function resortState(prev: TorrentState, overrides: Partial<Pick<TorrentState, "torrents" | "sort_column" | "sort_ascending">> = {}): TorrentState {
     const torrents = overrides.torrents ?? prev.torrents;
     const sort_column = overrides.sort_column ?? prev.sort_column;
@@ -184,7 +226,7 @@ interface TorrentState {
     server_state: TransferInfo;
 }
 
-type Mode = "normal" | "sorting";
+type Mode = "normal" | "sorting" | "add-torrent";
 
 interface AppProps {
     url: string;
@@ -192,7 +234,7 @@ interface AppProps {
     defaultSavePath: string;
 }
 
-export function App({ url, sid }: AppProps) {
+export function App({ url, sid, defaultSavePath }: AppProps) {
     const [state, setState] = useState<TorrentState | null>(null);
     const [mode, setMode] = useState<Mode>("normal");
     const ridRef = useRef(0);
@@ -241,6 +283,14 @@ export function App({ url, sid }: AppProps) {
 
             if (input === "s") {
                 setMode("sorting");
+            }
+
+            if (input === "t") {
+                setMode("add-torrent");
+            }
+        } else if (mode === "add-torrent") {
+            if (key.escape) {
+                setMode("normal");
             }
         } else if (mode === "sorting") {
             if (key.escape) {
@@ -337,16 +387,23 @@ export function App({ url, sid }: AppProps) {
         scrollOffsetRef.current = maxScrollOffset;
     }
 
+    const helpKeys: [string, string][] = mode === "sorting"
+        ? [["Tab", "column"], ["Space", "toggle order"], ["Esc", "done"]]
+        : mode === "add-torrent"
+        ? [["Tab", "switch field"], ["Esc", "close"]]
+        : [["↑↓", "navigate"], ["←→", "scroll"], ["PgUp/PgDn", "page"], ["Home/End", "jump"], ["s", "sort"], ["t", "add torrent"], ["q", "quit"]];
+
     return (
-        <Box width="100%" height="100%" flexDirection="column">
-            <Table torrents={state.torrents_sorted} selected_torrent={state.selected_torrent} scrollOffset={scrollOffsetRef.current} scrollX={scrollXRef.current} sort_column={state.sort_column} sort_ascending={state.sort_ascending} sorting={mode === "sorting"} maxRows={maxRows} screenWidth={screenWidth} />
-            <Box flexGrow={1} />
+        <Box width={screenWidth} height={screenRows} flexDirection="column">
+            <Box flexGrow={1} flexDirection="column">
+                {mode === "add-torrent"
+                    ? <AddTorrentForm serverUrl={url} sid={sid} defaultSavePath={defaultSavePath} onClose={() => setMode("normal")} />
+                    : <Table torrents={state.torrents_sorted} selected_torrent={state.selected_torrent} scrollOffset={scrollOffsetRef.current} scrollX={scrollXRef.current} sort_column={state.sort_column} sort_ascending={state.sort_ascending} sorting={mode === "sorting"} maxRows={maxRows} screenWidth={screenWidth} />
+                }
+            </Box>
             <Text>{"─".repeat(screenWidth)}</Text>
             <StatusBar dl_info_speed={state.server_state?.dl_info_speed ?? 0} dl_info_data={state.server_state?.dl_info_data ?? 0} up_info_speed={state.server_state?.up_info_speed ?? 0} up_info_data={state.server_state?.up_info_data ?? 0} screenWidth={screenWidth} />
-            <HelpBar keys={mode === "sorting"
-                ? [["Tab", "column"], ["Space", "toggle order"], ["Esc", "done"]]
-                : [["↑↓", "navigate"], ["←→", "scroll"], ["PgUp/PgDn", "page"], ["Home/End", "jump"], ["s", "sort"], ["q", "quit"]]
-            } />
+            <HelpBar keys={helpKeys} />
         </Box>
     );
 }
