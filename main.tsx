@@ -1,15 +1,17 @@
+import { useState, useEffect } from "react";
 import fs from "fs";
 import path from "path";
 import { parse } from "smol-toml";
-import { render } from "ink";
+import { render, Text } from "ink";
 import { authenticate } from "./api.js";
 import { App } from "./app.js";
+import { Login } from "./login.js";
 
 interface Config {
-    connection: {
-        url: string;
-        username: string;
-        password: string;
+    connection?: {
+        url?: string;
+        username?: string;
+        password?: string;
     };
 }
 
@@ -28,14 +30,36 @@ function loadConfig(): Config {
     return parse(raw) as unknown as Config;
 }
 
-async function main(): Promise<void> {
-    const config = loadConfig();
-    const { url, username, password } = config.connection;
-
-    console.log(`Connecting to ${url}...`);
-    const sid = await authenticate(url, username, password);
-
-    render(<App url={url} sid={sid} />);
+interface RootProps {
+    defaultUrl?: string;
+    defaultUsername?: string;
+    defaultPassword?: string;
 }
 
-main();
+function Root({ defaultUrl, defaultUsername, defaultPassword }: RootProps) {
+    const [session, setSession] = useState<{ url: string; sid: string } | null>(null);
+    const [autoLoginFailed, setAutoLoginFailed] = useState(false);
+    const autoLogin = defaultUrl && defaultUsername && defaultPassword && !autoLoginFailed;
+
+    useEffect(() => {
+        if (defaultUrl && defaultUsername && defaultPassword) {
+            authenticate(defaultUrl, defaultUsername, defaultPassword)
+                .then((sid) => setSession({ url: defaultUrl, sid }))
+                .catch(() => setAutoLoginFailed(true));
+        }
+    }, []);
+
+    if (autoLogin && session === null) {
+        return <Text color="yellow">Connecting to {defaultUrl}...</Text>;
+    }
+
+    if (session === null) {
+        return <Login defaultUrl={defaultUrl} defaultUsername={defaultUsername} onLogin={(url, sid) => setSession({ url, sid })} />;
+    }
+
+    return <App url={session.url} sid={session.sid} />;
+}
+
+const config = loadConfig();
+const conn = config.connection;
+render(<Root defaultUrl={conn?.url} defaultUsername={conn?.username} defaultPassword={conn?.password} />);
