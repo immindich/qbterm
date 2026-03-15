@@ -2,3 +2,6 @@
 url = "http://localhost:8080"
 username = "admin"
 password = "adminadmin"
+
+# [debug]
+# raw_status = true

@@ -27,6 +27,57 @@ function formatProgress(progress: number): string {
     return (progress * 100).toFixed(2) + "%";
 }
 
+function stateIcon(state: string): string {
+    switch (state) {
+        case "downloading":
+        case "forcedDL":
+        case "metaDL":
+        case "forcedMetaDL":
+            return "▼";
+        case "uploading":
+        case "forcedUP":
+        case "stalledUP":
+            return "▲";
+        case "stoppedDL":
+        case "stoppedUP":
+        case "pausedDL":
+        case "pausedUP":
+            return "⏸";
+        case "error":
+        case "missingFiles":
+            return "⚠";
+        default:
+            return " ";
+    }
+}
+
+function stateText(state: string): string {
+    switch (state) {
+        case "downloading": return "Downloading";
+        case "forcedDL": return "[F] Downloading";
+        case "metaDL": return "Downloading metadata";
+        case "forcedMetaDL": return "[F] Downloading metadata";
+        case "uploading": return "Seeding";
+        case "forcedUP": return "[F] Seeding";
+        case "stalledUP": return "Seeding";
+        case "stalledDL": return "Stalled";
+        case "stoppedDL": return "Stopped";
+        case "stoppedUP": return "Completed";
+        case "pausedDL": return "Stopped";
+        case "pausedUP": return "Completed";
+        case "queuedDL": return "Queued";
+        case "queuedUP": return "Queued";
+        case "checkingDL": return "Checking";
+        case "checkingUP": return "Checking";
+        case "queuedForChecking": return "Queued for checking";
+        case "checkingResumeData": return "Checking resume data";
+        case "moving": return "Moving";
+        case "missingFiles": return "Missing Files";
+        case "error": return "Errored";
+        default: return state;
+    }
+}
+
 function padOrTruncate(str: string, width: number): string {
     if (str.length > width) return str.slice(0, width);
     return str.padEnd(width);
@@ -40,11 +91,13 @@ interface Column {
     sort: ((a: TorrentInfo, b: TorrentInfo) => number) | null;
 }
 
+let rawStatus = false;
+
 const columns: Column[] = [
-    { name: "Name", key: "name", width: 20, render: (t) => t.name, sort: (a, b) => a.name.localeCompare(b.name) },
+    { name: "Name", key: "name", width: 20, render: (t) => stateIcon(t.state) + " " + t.name, sort: (a, b) => a.name.localeCompare(b.name) },
     { name: "Size", key: "size", width: 10, render: (t) => formatBytes(t.size), sort: null },
     { name: "Progress", key: "progress", width: 10, render: (t) => formatProgress(t.progress), sort: null },
-    { name: "Status", key: "state", width: 10, render: (t) => t.state, sort: null },
+    { name: "Status", key: "state", width: 22, render: (t) => rawStatus ? t.state : stateText(t.state), sort: null },
     { name: "Down Speed", key: "dlspeed", width: 12, render: (t) => formatBytes(t.dlspeed) + "/s", sort: null },
     { name: "Up Speed", key: "upspeed", width: 10, render: (t) => formatBytes(t.upspeed) + "/s", sort: null },
 ];
@@ -235,9 +288,11 @@ interface AppProps {
     url: string;
     sid: string;
     defaultSavePath: string;
+    rawStatus?: boolean;
 }
 
-export function App({ url, sid, defaultSavePath }: AppProps) {
+export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp }: AppProps) {
+    rawStatus = rawStatusProp ?? false;
     const [state, setState] = useState<TorrentState | null>(null);
     const [mode, setMode] = useState<Mode>("normal");
     const ridRef = useRef(0);

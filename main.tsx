@@ -13,6 +13,9 @@ interface Config {
         username?: string;
         password?: string;
     };
+    debug?: {
+        raw_status?: boolean;
+    };
 }
 
 const CONFIG_PATH = path.join(process.cwd(), "config.toml");
@@ -34,9 +37,10 @@ interface RootProps {
     defaultUrl?: string;
     defaultUsername?: string;
     defaultPassword?: string;
+    rawStatus?: boolean;
 }
 
-function Root({ defaultUrl, defaultUsername, defaultPassword }: RootProps) {
+function Root({ defaultUrl, defaultUsername, defaultPassword, rawStatus }: RootProps) {
     const [session, setSession] = useState<{ url: string; sid: string; defaultSavePath: string } | null>(null);
     const [autoLoginFailed, setAutoLoginFailed] = useState(false);
     const autoLogin = defaultUrl && defaultUsername && defaultPassword && !autoLoginFailed;
@@ -63,9 +67,9 @@ function Root({ defaultUrl, defaultUsername, defaultPassword }: RootProps) {
         return <Login defaultUrl={defaultUrl} defaultUsername={defaultUsername} onLogin={handleLogin} />;
     }
 
-    return <App url={session.url} sid={session.sid} defaultSavePath={session.defaultSavePath} />;
+    return <App url={session.url} sid={session.sid} defaultSavePath={session.defaultSavePath} rawStatus={rawStatus} />;
 }
 
 const config = loadConfig();
 const conn = config.connection;
-render(<Root defaultUrl={conn?.url} defaultUsername={conn?.username} defaultPassword={conn?.password} />);
+render(<Root defaultUrl={conn?.url} defaultUsername={conn?.username} defaultPassword={conn?.password} rawStatus={config.debug?.raw_status} />);
