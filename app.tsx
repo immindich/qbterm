@@ -189,8 +189,7 @@ const tableWidth = 2 + columns.reduce((sum, col) => sum + col.width, 0) + (colum
 interface TableProps {
     torrents: TorrentInfo[];
     selected_torrent: string | null;
-    scrollOffset: number;
-    scrollX: number;
+    selected_torrent_index: number;
     maxRows: number;
     sort_column: number;
     sort_ascending: boolean;
@@ -198,7 +197,31 @@ interface TableProps {
     screenWidth: number;
 }
 
-function Table({ torrents, selected_torrent, scrollOffset, scrollX, maxRows, sort_column, sort_ascending, sorting, screenWidth }: TableProps) {
+function Table({ torrents, selected_torrent, selected_torrent_index, maxRows, sort_column, sort_ascending, sorting, screenWidth }: TableProps) {
+    const scrollOffsetRef = useRef(0);
+    const scrollXRef = useRef(0);
+
+    useInput((_input, key) => {
+        const scrollXDelta = key.rightArrow ? 4 : key.leftArrow ? -4 : 0;
+        if (scrollXDelta !== 0) {
+            const maxScrollX = Math.max(0, tableWidth - screenWidth);
+            scrollXRef.current = Math.max(0, Math.min(maxScrollX, scrollXRef.current + scrollXDelta));
+        }
+    });
+
+    // Keep selection in view
+    const maxScrollOffset = Math.max(0, torrents.length - maxRows);
+    if (scrollOffsetRef.current > maxScrollOffset) {
+        scrollOffsetRef.current = maxScrollOffset;
+    }
+    if (selected_torrent_index < scrollOffsetRef.current) {
+        scrollOffsetRef.current = selected_torrent_index;
+    } else if (selected_torrent_index >= scrollOffsetRef.current + maxRows) {
+        scrollOffsetRef.current = selected_torrent_index - maxRows + 1;
+    }
+
+    const scrollOffset = scrollOffsetRef.current;
+    const scrollX = scrollXRef.current;
     const visible = maxRows > 0 ? torrents.slice(scrollOffset, scrollOffset + maxRows) : torrents;
 
     return (
@@ -296,8 +319,6 @@ export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp }: App
     const [state, setState] = useState<TorrentState | null>(null);
     const [mode, setMode] = useState<Mode>("normal");
     const ridRef = useRef(0);
-    const scrollOffsetRef = useRef(0);
-    const scrollXRef = useRef(0);
     const { columns: screenWidth, rows: screenRows } = useTerminalSize();
     const maxRows = screenRows - 5;
 
@@ -309,7 +330,6 @@ export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp }: App
                 exit();
             }
 
-            const isPage = key.pageUp || key.pageDown;
             const delta = key.upArrow ? -1 : key.downArrow ? 1 : key.pageUp ? -maxRows : key.pageDown ? maxRows : key.home ? -Infinity : key.end ? Infinity : 0;
             if (delta !== 0) {
                 setState((prev) => {
@@ -320,23 +340,8 @@ export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp }: App
                     const len = prev.torrents_sorted.length;
                     const new_index = Math.max(0, Math.min(len - 1, prev.selected_torrent_index + delta));
 
-                    if (isPage) {
-                        scrollOffsetRef.current = Math.max(0, Math.min(len - maxRows, scrollOffsetRef.current + delta));
-                    } else if (new_index < scrollOffsetRef.current) {
-                        scrollOffsetRef.current = new_index;
-                    } else if (new_index >= scrollOffsetRef.current + maxRows) {
-                        scrollOffsetRef.current = new_index - maxRows + 1;
-                    }
-
                     return { ...prev, selected_torrent_index: new_index, selected_torrent: prev.torrents_sorted[new_index].hash };
                 });
-            }
-
-            const scrollXDelta = key.rightArrow ? 4 : key.leftArrow ? -4 : 0;
-            if (scrollXDelta !== 0) {
-                const maxScrollX = Math.max(0, tableWidth - screenWidth);
-                scrollXRef.current = Math.max(0, Math.min(maxScrollX, scrollXRef.current + scrollXDelta));
-                setState((prev) => prev && { ...prev });
             }
 
             if (input === "s") {
@@ -452,11 +457,6 @@ export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp }: App
         return <Box width="100%" height="100%"><Text>Loading...</Text></Box>;
     }
 
-    const maxScrollOffset = Math.max(0, state.torrents_sorted.length - maxRows);
-    if (scrollOffsetRef.current > maxScrollOffset) {
-        scrollOffsetRef.current = maxScrollOffset;
-    }
-
     const helpKeys: [string, string][] = mode === "sorting"
         ? [["Tab", "column"], ["Space", "toggle order"], ["Esc", "done"]]
         : mode === "add-torrent"
@@ -468,7 +468,7 @@ export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp }: App
             <Box flexGrow={1} flexDirection="column">
                 {mode === "add-torrent"
                     ? <AddTorrentForm serverUrl={url} sid={sid} defaultSavePath={defaultSavePath} onClose={() => setMode("normal")} />
-                    : <Table torrents={state.torrents_sorted} selected_torrent={state.selected_torrent} scrollOffset={scrollOffsetRef.current} scrollX={scrollXRef.current} sort_column={state.sort_column} sort_ascending={state.sort_ascending} sorting={mode === "sorting"} maxRows={maxRows} screenWidth={screenWidth} />
+                    : <Table torrents={state.torrents_sorted} selected_torrent={state.selected_torrent} selected_torrent_index={state.selected_torrent_index} sort_column={state.sort_column} sort_ascending={state.sort_ascending} sorting={mode === "sorting"} maxRows={maxRows} screenWidth={screenWidth} />
                 }
             </Box>
             <Text>{"─".repeat(screenWidth)}</Text>
