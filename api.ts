@@ -115,7 +115,7 @@ export interface AddTorrentOptions {
     category?: string;
     tags?: string[];
     skip_checking?: boolean;
-    paused?: boolean;
+    stopped?: boolean;
     root_folder?: boolean;
     rename?: string;
     upLimit?: number;
@@ -140,7 +140,7 @@ export async function addTorrents(
     if (options.category) form.append("category", options.category);
     if (options.tags) form.append("tags", options.tags.join(","));
     if (options.skip_checking !== undefined) form.append("skip_checking", String(options.skip_checking));
-    if (options.paused !== undefined) form.append("paused", String(options.paused));
+    if (options.stopped !== undefined) form.append("stopped", String(options.stopped));
     if (options.root_folder !== undefined) form.append("root_folder", String(options.root_folder));
     if (options.rename) form.append("rename", options.rename);
     if (options.upLimit !== undefined) form.append("upLimit", String(options.upLimit));

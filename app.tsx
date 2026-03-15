@@ -44,6 +44,7 @@ const columns: Column[] = [
     { name: "Name", key: "name", width: 20, render: (t) => t.name, sort: (a, b) => a.name.localeCompare(b.name) },
     { name: "Size", key: "size", width: 10, render: (t) => formatBytes(t.size), sort: null },
     { name: "Progress", key: "progress", width: 10, render: (t) => formatProgress(t.progress), sort: null },
+    { name: "Status", key: "state", width: 10, render: (t) => t.state, sort: null },
     { name: "Down Speed", key: "dlspeed", width: 12, render: (t) => formatBytes(t.dlspeed) + "/s", sort: null },
     { name: "Up Speed", key: "upspeed", width: 10, render: (t) => formatBytes(t.upspeed) + "/s", sort: null },
 ];
@@ -166,6 +167,7 @@ interface AddTorrentFormProps {
 function AddTorrentForm({ serverUrl, sid, defaultSavePath, onClose }: AddTorrentFormProps) {
     const [url, setUrl] = useState("");
     const [savePath, setSavePath] = useState(defaultSavePath);
+    const [startPaused, setStartPaused] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -173,7 +175,7 @@ function AddTorrentForm({ serverUrl, sid, defaultSavePath, onClose }: AddTorrent
         if (loading || !url.trim()) return;
         setLoading(true);
         setError(null);
-        addTorrents(serverUrl, sid, { urls: [url.trim()], savepath: savePath })
+        addTorrents(serverUrl, sid, { urls: [url.trim()], savepath: savePath, stopped: startPaused })
             .then(() => onClose())
             .catch((err) => {
                 setError(err instanceof Error ? err.message : String(err));
@@ -188,6 +190,7 @@ function AddTorrentForm({ serverUrl, sid, defaultSavePath, onClose }: AddTorrent
                 fields={[
                     { label: "URL", value: url, onChange: setUrl },
                     { label: "Save path", value: savePath, onChange: setSavePath },
+                    { label: "Start paused", type: "checkbox", value: startPaused, onChange: setStartPaused }
                 ]}
                 onSubmit={handleSubmit}
             />

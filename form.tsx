@@ -1,13 +1,24 @@
 import { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
+import { Checkbox } from "./checkbox.js";
 
-interface FormField {
+interface TextFormField {
+    type?: "text";
     label: string;
     value: string;
     onChange: (value: string) => void;
     mask?: string;
 }
+
+interface CheckboxFormField {
+    type: "checkbox";
+    label: string;
+    value: boolean;
+    onChange: (value: boolean) => void;
+}
+
+export type FormField = TextFormField | CheckboxFormField;
 
 interface FormProps {
     title: string;
@@ -34,13 +45,17 @@ export function Form({ title, fields, onSubmit, initialFocusIndex = 0 }: FormPro
                 {fields.map((field, i) => (
                     <Box flexDirection="row" gap={1} key={field.label}>
                         <Text>{field.label.padStart(maxLabel)}:</Text>
-                        <TextInput
-                            value={field.value}
-                            onChange={field.onChange}
-                            focus={i === focusIndex}
-                            mask={field.mask}
-                            onSubmit={onSubmit}
-                        />
+                        {field.type === "checkbox" ? (
+                            <Checkbox value={field.value} onChange={field.onChange} focus={i === focusIndex} onSubmit={onSubmit} />
+                        ) : (
+                            <TextInput
+                                value={field.value}
+                                onChange={field.onChange}
+                                focus={i === focusIndex}
+                                mask={field.mask}
+                                onSubmit={onSubmit}
+                            />
+                        )}
                     </Box>
                 ))}
             </Box>
