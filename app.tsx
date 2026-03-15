@@ -199,13 +199,15 @@ interface TableProps {
 
 function Table({ torrents, selected_torrent, selected_torrent_index, maxRows, sort_column, sort_ascending, sorting, screenWidth }: TableProps) {
     const scrollOffsetRef = useRef(0);
-    const scrollXRef = useRef(0);
+    const [scrollX, setScrollX] = useState(0);
 
     useInput((_input, key) => {
         const scrollXDelta = key.rightArrow ? 4 : key.leftArrow ? -4 : 0;
         if (scrollXDelta !== 0) {
-            const maxScrollX = Math.max(0, tableWidth - screenWidth);
-            scrollXRef.current = Math.max(0, Math.min(maxScrollX, scrollXRef.current + scrollXDelta));
+            setScrollX((prev) => {
+                const maxScrollX = Math.max(0, tableWidth - screenWidth);
+                return Math.max(0, Math.min(maxScrollX, prev + scrollXDelta));
+            });
         }
     });
 
@@ -221,7 +223,6 @@ function Table({ torrents, selected_torrent, selected_torrent_index, maxRows, so
     }
 
     const scrollOffset = scrollOffsetRef.current;
-    const scrollX = scrollXRef.current;
     const visible = maxRows > 0 ? torrents.slice(scrollOffset, scrollOffset + maxRows) : torrents;
 
     return (
