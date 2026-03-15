@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, memo } from "react";
 import { Box, Text, useInput, useApp, useStdout } from "ink";
-import { getMainData, addTorrents, TransferInfo, type TorrentInfo } from "./api.js";
+import { getMainData, addTorrents, stopTorrents, startTorrents, TransferInfo, type TorrentInfo } from "./api.js";
 import { Form } from "./form.js";
 
 function useTerminalSize() {
@@ -346,6 +346,18 @@ export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp }: App
             if (input === "t") {
                 setMode("add-torrent");
             }
+
+            if (input === "p") {
+                setState((prev) => {
+                    if (prev === null || prev.selected_torrent === null) return prev;
+                    const torrent = prev.torrents[prev.selected_torrent];
+                    if (!torrent) return prev;
+                    const stopped = ["stoppedDL", "stoppedUP", "pausedDL", "pausedUP"].includes(torrent.state);
+                    const action = stopped ? startTorrents : stopTorrents;
+                    action(url, sid, [torrent.hash]).catch(() => {});
+                    return prev;
+                });
+            }
         } else if (mode === "add-torrent") {
             if (key.escape) {
                 setMode("normal");
@@ -449,7 +461,7 @@ export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp }: App
         ? [["Tab", "column"], ["Space", "toggle order"], ["Esc", "done"]]
         : mode === "add-torrent"
         ? [["Tab", "switch field"], ["Esc", "close"]]
-        : [["↑↓", "navigate"], ["←→", "scroll"], ["PgUp/PgDn", "page"], ["Home/End", "jump"], ["s", "sort"], ["t", "add torrent"], ["q", "quit"]];
+        : [["↑↓", "navigate"], ["←→", "scroll"], ["PgUp/PgDn", "page"], ["Home/End", "jump"], ["s", "sort"], ["t", "add torrent"], ["p", "pause/resume"], ["q", "quit"]];
 
     return (
         <Box width={screenWidth} height={screenRows} flexDirection="column">

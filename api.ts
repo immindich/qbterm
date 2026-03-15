@@ -167,6 +167,24 @@ export async function addTorrents(
     }
 }
 
+export async function stopTorrents(url: string, sid: string, hashes: string[]): Promise<void> {
+    const response = await fetch(`${url}/api/v2/torrents/stop`, {
+        method: "POST",
+        headers: { Cookie: `SID=${sid}`, "Content-Type": "application/x-www-form-urlencoded" },
+        body: `hashes=${hashes.join("|")}`,
+    });
+    if (!response.ok) throw new Error(`Failed to stop torrent: HTTP ${response.status}`);
+}
+
+export async function startTorrents(url: string, sid: string, hashes: string[]): Promise<void> {
+    const response = await fetch(`${url}/api/v2/torrents/start`, {
+        method: "POST",
+        headers: { Cookie: `SID=${sid}`, "Content-Type": "application/x-www-form-urlencoded" },
+        body: `hashes=${hashes.join("|")}`,
+    });
+    if (!response.ok) throw new Error(`Failed to start torrent: HTTP ${response.status}`);
+}
+
 export async function getMainData(
     url: string,
     sid: string,
