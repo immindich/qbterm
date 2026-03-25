@@ -64,10 +64,73 @@ export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp, onSes
     const [mode, setMode] = useState<Mode>("normal");
     const [selectedTorrent, setSelectedTorrent] = useState<string | null>(null);
     const ridRef = useRef(0);
+    const fetchIdRef = useRef(0);
     const { columns: screenWidth, rows: screenRows } = useTerminalSize();
     const maxRows = screenRows - 5;
 
     const { exit } = useApp();
+
+    async function fetchData() {
+        const thisRequest = ++fetchIdRef.current;
+        let data;
+        try {
+            data = await getMainData(url, sid, ridRef.current);
+        } catch (error) {
+            if (error instanceof HttpError && error.status === 403) {
+                onSessionExpired();
+                return;
+            }
+            setErrored(true);
+            setErrorMessage(error instanceof Error ? error.message : String(error));
+            return;
+        }
+        if (thisRequest !== fetchIdRef.current) return;
+        setErrored(false);
+        setErrorMessage(null);
+        ridRef.current = data.rid;
+
+        setState((prev) => {
+            let torrents = prev?.torrents ?? {};
+
+            if (data.full_update) {
+                torrents = {};
+            }
+
+            if (data.torrents) {
+                for (const [hash, partial] of Object.entries(data.torrents)) {
+                    torrents = { ...torrents, [hash]: { ...torrents[hash], ...partial, hash } as TorrentInfo };
+                }
+            }
+
+            if (data.torrents_removed) {
+                torrents = { ...torrents };
+                for (const hash of data.torrents_removed) {
+                    delete torrents[hash];
+                }
+            }
+
+            const default_server_state: TransferInfo = {
+                dl_info_speed: 0,
+                dl_info_data: 0,
+                up_info_speed: 0,
+                up_info_data: 0,
+                dl_rate_limit: 0,
+                up_rate_limit: 0,
+                dht_nodes: 0,
+                connection_status: "disconnected",
+                queueing: false,
+                use_alt_speed_limits: false,
+                refresh_interval: 1000,
+            };
+
+            const server_state: TransferInfo = {
+                ...(prev?.server_state ?? default_server_state),
+                ...data.server_state,
+            };
+
+            return { torrents, server_state };
+        });
+    }
 
     useInput((input, key) => {
         if (mode === "normal") {
@@ -104,67 +167,6 @@ export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp, onSes
 
     useEffect(() => {
         ridRef.current = 0;
-
-        async function fetchData() {
-            let data;
-            try {
-                data = await getMainData(url, sid, ridRef.current);
-            } catch (error) {
-                if (error instanceof HttpError && error.status === 403) {
-                    onSessionExpired();
-                    return;
-                }
-                setErrored(true);
-                setErrorMessage(error instanceof Error ? error.message : String(error));
-                return;
-            }
-            setErrored(false);
-            setErrorMessage(null);
-            ridRef.current = data.rid;
-
-            setState((prev) => {
-                let torrents = prev?.torrents ?? {};
-
-                if (data.full_update) {
-                    torrents = {};
-                }
-
-                if (data.torrents) {
-                    for (const [hash, partial] of Object.entries(data.torrents)) {
-                        torrents = { ...torrents, [hash]: { ...torrents[hash], ...partial, hash } as TorrentInfo };
-                    }
-                }
-
-                if (data.torrents_removed) {
-                    torrents = { ...torrents };
-                    for (const hash of data.torrents_removed) {
-                        delete torrents[hash];
-                    }
-                }
-
-                const default_server_state: TransferInfo = {
-                    dl_info_speed: 0,
-                    dl_info_data: 0,
-                    up_info_speed: 0,
-                    up_info_data: 0,
-                    dl_rate_limit: 0,
-                    up_rate_limit: 0,
-                    dht_nodes: 0,
-                    connection_status: "disconnected",
-                    queueing: false,
-                    use_alt_speed_limits: false,
-                    refresh_interval: 1000,
-                };
-
-                const server_state: TransferInfo = {
-                    ...(prev?.server_state ?? default_server_state),
-                    ...data.server_state,
-                };
-
-                return { torrents, server_state };
-            });
-        }
-
         fetchData();
         const interval = setInterval(fetchData, 1000);
         return () => clearInterval(interval);
