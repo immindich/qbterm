@@ -15,6 +15,7 @@ interface Config {
     };
     debug?: {
         raw_status?: boolean;
+        log?: boolean;
     };
 }
 
@@ -90,4 +91,9 @@ function Root({ defaultUrl, defaultUsername, defaultPassword, rawStatus }: RootP
 
 const config = loadConfig();
 const conn = config.connection;
+if (config.debug?.log) {
+    const { enableDebugLog } = await import("./api.js");
+    enableDebugLog();
+}
+
 render(<Root defaultUrl={conn?.url} defaultUsername={conn?.username} defaultPassword={conn?.password} rawStatus={config.debug?.raw_status} />);

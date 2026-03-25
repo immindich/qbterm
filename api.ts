@@ -1,3 +1,29 @@
+import fs from "fs";
+import path from "path";
+
+let debugLog = false;
+const logPath = path.join(process.cwd(), "debug.log");
+
+export function enableDebugLog() {
+    debugLog = true;
+    fs.writeFileSync(logPath, "");
+}
+
+function log(message: string) {
+    if (!debugLog) return;
+    fs.appendFileSync(logPath, `[${new Date().toISOString()}] ${message}\n`);
+}
+
+async function loggedFetch(url: string, init?: RequestInit): Promise<Response> {
+    log(`>> ${init?.method ?? "GET"} ${url}`);
+    if (init?.body) log(`>> Body: ${init.body}`);
+    const response = await fetch(url, init);
+    const body = await response.clone().text();
+    log(`<< ${response.status} (${body.length} bytes)`);
+    log(`<< ${body}`);
+    return response;
+}
+
 export class HttpError extends Error {
     constructor(public status: number, message: string) {
         super(message);
@@ -58,7 +84,7 @@ export async function authenticate(
     username: string,
     password: string,
 ): Promise<string> {
-    const response = await fetch(`${url}/api/v2/auth/login`, {
+    const response = await loggedFetch(`${url}/api/v2/auth/login`, {
         method: "POST",
         headers: {
             "Content-Type": "application/x-www-form-urlencoded",
@@ -84,7 +110,7 @@ export async function getDefaultSavePath(
     url: string,
     sid: string,
 ): Promise<string> {
-    const response = await fetch(`${url}/api/v2/app/defaultSavePath`, {
+    const response = await loggedFetch(`${url}/api/v2/app/defaultSavePath`, {
         headers: { Cookie: `SID=${sid}` },
     });
 
@@ -100,7 +126,7 @@ export async function getTorrents(
     sid: string,
     filter: string = "all",
 ): Promise<TorrentInfo[]> {
-    const response = await fetch(
+    const response = await loggedFetch(
         `${url}/api/v2/torrents/info?filter=${filter}`,
         {
             headers: { Cookie: `SID=${sid}` },
@@ -157,7 +183,7 @@ export async function addTorrents(
     if (options.sequentialDownload !== undefined) form.append("sequentialDownload", String(options.sequentialDownload));
     if (options.firstLastPiecePrio !== undefined) form.append("firstLastPiecePrio", String(options.firstLastPiecePrio));
 
-    const response = await fetch(`${url}/api/v2/torrents/add`, {
+    const response = await loggedFetch(`${url}/api/v2/torrents/add`, {
         method: "POST",
         headers: { Cookie: `SID=${sid}` },
         body: form,
@@ -174,7 +200,7 @@ export async function addTorrents(
 }
 
 export async function stopTorrents(url: string, sid: string, hashes: string[]): Promise<void> {
-    const response = await fetch(`${url}/api/v2/torrents/stop`, {
+    const response = await loggedFetch(`${url}/api/v2/torrents/stop`, {
         method: "POST",
         headers: { Cookie: `SID=${sid}`, "Content-Type": "application/x-www-form-urlencoded" },
         body: `hashes=${hashes.join("|")}`,
@@ -183,7 +209,7 @@ export async function stopTorrents(url: string, sid: string, hashes: string[]): 
 }
 
 export async function startTorrents(url: string, sid: string, hashes: string[]): Promise<void> {
-    const response = await fetch(`${url}/api/v2/torrents/start`, {
+    const response = await loggedFetch(`${url}/api/v2/torrents/start`, {
         method: "POST",
         headers: { Cookie: `SID=${sid}`, "Content-Type": "application/x-www-form-urlencoded" },
         body: `hashes=${hashes.join("|")}`,
@@ -196,7 +222,7 @@ export async function getMainData(
     sid: string,
     rid: number = 0,
 ): Promise<MainData> {
-    const response = await fetch(
+    const response = await loggedFetch(
         `${url}/api/v2/sync/maindata?rid=${rid}`,
         {
             headers: { Cookie: `SID=${sid}` },

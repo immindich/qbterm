@@ -5,3 +5,4 @@ password = "adminadmin"
 
 # [debug]
 # raw_status = true
+# log = true
