@@ -4,6 +4,7 @@ import { getMainData, stopTorrents, startTorrents, HttpError, TransferInfo, type
 import { formatBytes } from "./format.js";
 import { Table, setRawStatus } from "./table.js";
 import { AddTorrentForm } from "./add-torrent-form.js";
+import { Info } from "./info.js";
 
 function useTerminalSize() {
     const { stdout } = useStdout();
@@ -46,7 +47,7 @@ interface AppState {
     server_state: TransferInfo;
 }
 
-type Mode = "normal" | "sorting" | "add-torrent";
+type Mode = "normal" | "sorting" | "add-torrent" | "info";
 
 interface AppProps {
     url: string;
@@ -146,6 +147,10 @@ export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp, onSes
                 setMode("add-torrent");
             }
 
+            if (key.return) {
+                setMode("info");
+            }
+
             if (input === "p") {
                 if (state === null || selectedTorrent === null) return;
                 const torrent = state.torrents[selectedTorrent];
@@ -159,6 +164,10 @@ export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp, onSes
                 setMode("normal");
             }
         } else if (mode === "sorting") {
+            if (key.escape) {
+                setMode("normal");
+            }
+        } else if (mode === "info") {
             if (key.escape) {
                 setMode("normal");
             }
@@ -187,6 +196,8 @@ export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp, onSes
             <Box flexGrow={1} flexDirection="column">
                 {mode === "add-torrent"
                     ? <AddTorrentForm serverUrl={url} sid={sid} defaultSavePath={defaultSavePath} onClose={() => setMode("normal")} />
+                    : mode === "info" && selectedTorrent
+                    ? <Info url={url} name={state.torrents[selectedTorrent].name} sid={sid} hash={selectedTorrent} width={screenWidth} height={maxRows + 2} />
                     : <Table torrents={state.torrents} sorting={mode === "sorting"} maxRows={maxRows} screenWidth={screenWidth} onSelectionChange={setSelectedTorrent} />
                 }
             </Box>

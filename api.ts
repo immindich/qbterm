@@ -217,6 +217,40 @@ export async function startTorrents(url: string, sid: string, hashes: string[]):
     if (!response.ok) throw new HttpError(response.status, `Failed to start torrent: HTTP ${response.status}`);
 }
 
+export interface TorrentFile {
+    index: number;
+    name: string;
+    size: number;
+    progress: number;
+    priority: number;
+    is_seed: boolean;
+    piece_range: [number, number];
+    availability: number;
+}
+
+export async function getTorrentFiles(
+    url: string,
+    sid: string,
+    hash: string,
+    indexes?: number[],
+): Promise<TorrentFile[]> {
+    const params = new URLSearchParams({ hash });
+    if (indexes) params.set("indexes", indexes.join("|"));
+
+    const response = await loggedFetch(
+        `${url}/api/v2/torrents/files?${params}`,
+        {
+            headers: { Cookie: `SID=${sid}` },
+        },
+    );
+
+    if (!response.ok) {
+        throw new HttpError(response.status, `Failed to get torrent files: HTTP ${response.status}`);
+    }
+
+    return response.json() as Promise<TorrentFile[]>;
+}
+
 export async function getMainData(
     url: string,
     sid: string,
