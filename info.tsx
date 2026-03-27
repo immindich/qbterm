@@ -1,7 +1,28 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { getTorrentFiles, getTorrentProperties, type TorrentProperties, type TorrentFile } from "./api.js";
 import { formatBytes } from "./format.js";
+
+function usePolling<T>(fetcher: () => Promise<T>, deps: unknown[], interval: number = 5000): T | null {
+    const [data, setData] = useState<T | null>(null);
+    const stableFetcher = useCallback(fetcher, deps);
+
+    useEffect(() => {
+        let active = true;
+
+        function poll() {
+            stableFetcher().then((result) => {
+                if (active) setData(result);
+            }).catch(() => {});
+        }
+
+        poll();
+        const id = setInterval(poll, interval);
+        return () => { active = false; clearInterval(id); };
+    }, [stableFetcher, interval]);
+
+    return data;
+}
 
 interface InfoModeProps {
     url: string;
@@ -86,25 +107,11 @@ function ContentRow({ row }: { row: ContentRowProps }) {
 }
 
 function Content({ url, sid, hash }: InfoModeProps) {
-    const [files, setFiles] = useState<TorrentFile[]>([]);
-
-    useEffect(() => {
-        let active = true;
-
-        function fetchFiles() {
-            getTorrentFiles(url, sid, hash).then((data) => {
-                if (active) setFiles(data);
-            }).catch(() => {});
-        }
-
-        fetchFiles();
-        const interval = setInterval(fetchFiles, 5000);
-        return () => { active = false; clearInterval(interval); };
-    }, [url, sid, hash]);
+    const files = usePolling(() => getTorrentFiles(url, sid, hash), [url, sid, hash]);
 
     return (
         <Box flexDirection="column">
-            {contentRows(buildDirectory(files)).map((row) => <ContentRow key={row.name} row={row} />)}
+            {files && contentRows(buildDirectory(files)).map((row) => <ContentRow key={row.name} row={row} />)}
         </Box>
     );
 }
@@ -125,21 +132,7 @@ const propertiesRows: PropertiesRow[] = [
 ];
 
 function Properties({ url, sid, hash }: InfoModeProps) {
-    const [properties, setProperties] = useState<TorrentProperties | null>(null);
-
-    useEffect(() => {
-        let active = true;
-
-        function fetchProperties() {
-            getTorrentProperties(url, sid, hash).then((data) => {
-                if (active) setProperties(data);
-            }).catch(() => {});
-        }
-
-        fetchProperties();
-        const interval = setInterval(fetchProperties, 5000);
-        return () => { active = false; clearInterval(interval); };
-    }, [url, sid, hash]);
+    const properties = usePolling(() => getTorrentProperties(url, sid, hash), [url, sid, hash]);
 
     return (
         <Box flexDirection="column">
