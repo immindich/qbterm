@@ -2,6 +2,11 @@ import { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
 import { getTorrentFiles, type TorrentFile } from "./api.js";
 
+interface InfoModeProps {
+    url: string;
+    sid: string;
+    hash: string;
+}
 
 interface Directory {
     children_map: Record<string, Directory | number>;
@@ -9,22 +14,20 @@ interface Directory {
 
 function addFile(directory: Directory, name: string, index: number): void {
     const path = name.split("/");
-    if (path.length === 0) return;
-    let remaining = path.slice(0);
+    let pos = 0;
 
     let current = directory;
 
-    while (remaining.length > 1) {
-        const segment = remaining[0];
-        remaining = remaining.slice(1);
-
+    while (pos < path.length - 1) {
+        const segment = path[pos];
         if (!current.children_map[segment] || typeof current.children_map[segment] === "number") {
             current.children_map[segment] = { children_map: {} } as Directory;
         }
         current = current.children_map[segment] as Directory;
+        pos++;
     }
 
-    current.children_map[remaining[0]] = index;
+    current.children_map[path[pos]] = index;
 }
 
 function buildDirectory(files: TorrentFile[]): Directory {
@@ -81,13 +84,7 @@ function ContentRow({ row }: { row: ContentRowProps }) {
     );
 }
 
-interface ContentProps {
-    url: string;
-    sid: string;
-    hash: string;
-}
-
-function Content({ url, sid, hash }: ContentProps) {
+function Content({ url, sid, hash }: InfoModeProps) {
     const [files, setFiles] = useState<TorrentFile[]>([]);
 
     useEffect(() => {
@@ -111,6 +108,24 @@ function Content({ url, sid, hash }: ContentProps) {
     );
 }
 
+function Properties({ url, sid, hash }: InfoModeProps) {
+    return (
+        <Box flexDirection="column">
+            <Text>{"Properties"}</Text>
+        </Box>
+    );
+}
+
+interface Mode {
+    name: string;
+    component: (props: InfoModeProps) => React.ReactNode;
+}
+
+const modes: Mode[] = [
+    { name: "Properties", component: Properties },
+    { name: "Content", component: Content },
+];
+
 interface InfoProps {
     url: string;
     name: string;
@@ -121,12 +136,23 @@ interface InfoProps {
 }
 
 export function Info({ url, name, sid, hash, width, height }: InfoProps) {
+    const [mode, setMode] = useState<number>(0);
+
+    useInput((input, key) => {
+        if (key.tab) {
+            const dir = key.shift ? -1 : 1;
+            setMode((prev) => (prev + dir + modes.length) % modes.length);
+        }
+    });
+
+    const Component = modes[mode].component;
+
     return (
         <Box width={width} height={height} flexDirection="column">
             <Text bold={true}>{name}</Text>
             <Text>{"─".repeat(width)}</Text>
             <Box flexDirection="column">
-                <Content url={url} sid={sid} hash={hash} />
+                <Component url={url} sid={sid} hash={hash} />
             </Box>
         </Box>
     );
