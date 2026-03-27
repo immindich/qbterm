@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Box, Text } from "ink";
+import { Box, Text, useInput } from "ink";
 import { getTorrentFiles, type TorrentFile } from "./api.js";
 
 
@@ -81,24 +81,13 @@ function ContentRow({ row }: { row: ContentRowProps }) {
     );
 }
 
-function Content({ rows }: { rows: ContentRowProps[] }) {
-    return (
-        <Box flexDirection="column">
-            {rows.map((row) => <ContentRow key={row.name} row={row} />)}
-        </Box>
-    );
-}
-
-interface InfoProps {
+interface ContentProps {
     url: string;
-    name: string;
     sid: string;
     hash: string;
-    width: number;
-    height: number;
 }
 
-export function Info({ url, name, sid, hash, width, height }: InfoProps) {
+function Content({ url, sid, hash }: ContentProps) {
     const [files, setFiles] = useState<TorrentFile[]>([]);
 
     useEffect(() => {
@@ -116,11 +105,28 @@ export function Info({ url, name, sid, hash, width, height }: InfoProps) {
     }, [url, sid, hash]);
 
     return (
+        <Box flexDirection="column">
+            {contentRows(buildDirectory(files)).map((row) => <ContentRow key={row.name} row={row} />)}
+        </Box>
+    );
+}
+
+interface InfoProps {
+    url: string;
+    name: string;
+    sid: string;
+    hash: string;
+    width: number;
+    height: number;
+}
+
+export function Info({ url, name, sid, hash, width, height }: InfoProps) {
+    return (
         <Box width={width} height={height} flexDirection="column">
-            <Text>{name}</Text>
+            <Text bold={true}>{name}</Text>
             <Text>{"─".repeat(width)}</Text>
             <Box flexDirection="column">
-                <Content rows={contentRows(buildDirectory(files))} />
+                <Content url={url} sid={sid} hash={hash} />
             </Box>
         </Box>
     );
