@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import { getTorrentFiles, type TorrentFile } from "./api.js";
+import { getTorrentFiles, getTorrentProperties, type TorrentProperties, type TorrentFile } from "./api.js";
+import { formatBytes } from "./format.js";
 
 interface InfoModeProps {
     url: string;
@@ -108,10 +109,48 @@ function Content({ url, sid, hash }: InfoModeProps) {
     );
 }
 
+function formatTotalSession(total: number, session: number): string {
+    return formatBytes(total) + " (" + formatBytes(session) + " this session)";
+}
+
+interface PropertiesRow {
+    name: string;
+    value: (p: TorrentProperties) => string;
+}
+
+const propertiesRows: PropertiesRow[] = [
+    { name: "Downloaded", value: (p) => formatTotalSession(p.total_downloaded, p.total_downloaded_session)},
+    { name: "Uploaded", value: (p) => formatTotalSession(p.total_uploaded, p.total_uploaded_session)},
+    { name: "Ratio", value: (p) => (p.share_ratio ?? 0).toFixed(2)},
+];
+
 function Properties({ url, sid, hash }: InfoModeProps) {
+    const [properties, setProperties] = useState<TorrentProperties | null>(null);
+
+    useEffect(() => {
+        let active = true;
+
+        function fetchProperties() {
+            getTorrentProperties(url, sid, hash).then((data) => {
+                if (active) setProperties(data);
+            }).catch(() => {});
+        }
+
+        fetchProperties();
+        const interval = setInterval(fetchProperties, 5000);
+        return () => { active = false; clearInterval(interval); };
+    }, [url, sid, hash]);
+
     return (
         <Box flexDirection="column">
-            <Text>{"Properties"}</Text>
+            {
+            properties && propertiesRows.map((row) => (
+                <Box key={row.name}>
+                    <Box width={20}><Text>{row.name}</Text></Box>
+                    <Box width="100%"><Text>{row.value(properties)}</Text></Box>
+                </Box>
+            ))
+            }
         </Box>
     );
 }
