@@ -189,6 +189,8 @@ export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp, onSes
         ? [["Tab", "column"], ["Space", "toggle order"], ["Esc", "done"]]
         : mode === "add-torrent"
         ? [["Tab", "switch field"], ["Esc", "close"]]
+        : mode === "info"
+        ? [["Tab", "switch tab"], ["Esc", "back"]]
         : [["↑↓", "navigate"], ["←→", "scroll"], ["PgUp/PgDn", "page"], ["Home/End", "jump"], ["s", "sort"], ["t", "add torrent"], ["p", "pause/resume"], ["q", "quit"]];
 
     return (

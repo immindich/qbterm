@@ -28,6 +28,7 @@ interface InfoModeProps {
     url: string;
     sid: string;
     hash: string;
+    maxRows: number;
 }
 
 interface Directory {
@@ -106,12 +107,12 @@ function ContentRow({ row }: { row: ContentRowProps }) {
     );
 }
 
-function Content({ url, sid, hash }: InfoModeProps) {
+function Content({ url, sid, hash, maxRows }: InfoModeProps) {
     const files = usePolling(() => getTorrentFiles(url, sid, hash), [url, sid, hash]);
 
     return (
         <Box flexDirection="column">
-            {files && contentRows(buildDirectory(files)).map((row) => <ContentRow key={row.name} row={row} />)}
+            {files && contentRows(buildDirectory(files)).slice(0, maxRows).map((row) => <ContentRow key={row.name} row={row} />)}
         </Box>
     );
 }
@@ -131,7 +132,7 @@ const propertiesRows: PropertiesRow[] = [
     { name: "Ratio", value: (p) => (p.share_ratio ?? 0).toFixed(2)},
 ];
 
-function Properties({ url, sid, hash }: InfoModeProps) {
+function Properties({ url, sid, hash, maxRows }: InfoModeProps) {
     const properties = usePolling(() => getTorrentProperties(url, sid, hash), [url, sid, hash]);
 
     return (
@@ -156,7 +157,7 @@ function countryFlag(code: string): string {
     );
 }
 
-function Peers({ url, sid, hash }: InfoModeProps) {
+function Peers({ url, sid, hash, maxRows }: InfoModeProps) {
     const peers = usePolling(() => getTorrentPeers(url, sid, hash), [url, sid, hash]);
 
     return (
@@ -166,7 +167,7 @@ function Peers({ url, sid, hash }: InfoModeProps) {
                 <Box width={18}><Text bold>IP</Text></Box>
                 <Box width={10}><Text bold>Progress</Text></Box>
             </Box>
-            {peers && peers.map((peer) => (
+            {peers && peers.slice(0, maxRows - 1).map((peer) => (
                 <Box key={`${peer.ip}:${peer.port}`}>
                     <Box width={6}><Text>{countryFlag(peer.country_code)}</Text></Box>
                     <Box width={18}><Text>{peer.ip}</Text></Box>
@@ -209,12 +210,22 @@ export function Info({ url, name, sid, hash, width, height }: InfoProps) {
 
     const Component = modes[mode].component;
 
+    const contentHeight = height - 3; // title, tab bar, separator
+
     return (
         <Box width={width} height={height} flexDirection="column">
             <Text bold={true}>{name}</Text>
+            <Box>
+                {modes.map((m, i) => (
+                    <Text key={m.name}>
+                        {i > 0 ? " | " : ""}
+                        <Text bold={i === mode} dimColor={i !== mode}>{m.name}</Text>
+                    </Text>
+                ))}
+            </Box>
             <Text>{"─".repeat(width)}</Text>
-            <Box flexDirection="column">
-                <Component url={url} sid={sid} hash={hash} />
+            <Box flexDirection="column" height={contentHeight} overflow="hidden">
+                <Component url={url} sid={sid} hash={hash} maxRows={contentHeight} />
             </Box>
         </Box>
     );
