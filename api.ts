@@ -307,6 +307,45 @@ export async function getTorrentProperties(
     return response.json() as Promise<TorrentProperties>;
 }
 
+export interface TorrentPeer {
+    client: string;
+    connection: string;
+    country: string;
+    country_code: string;
+    dl_speed: number;
+    ip: string;
+    port: number;
+    progress: number;
+    up_speed: number;
+    flags: string;
+}
+
+interface TorrentPeersResponse {
+    full_update: boolean;
+    rid: number;
+    peers: Record<string, TorrentPeer>;
+}
+
+export async function getTorrentPeers(
+    url: string,
+    sid: string,
+    hash: string,
+): Promise<TorrentPeer[]> {
+    const response = await loggedFetch(
+        `${url}/api/v2/sync/torrentPeers?hash=${hash}&rid=0`,
+        {
+            headers: { Cookie: `SID=${sid}` },
+        },
+    );
+
+    if (!response.ok) {
+        throw new HttpError(response.status, `Failed to get torrent peers: HTTP ${response.status}`);
+    }
+
+    const data = await response.json() as TorrentPeersResponse;
+    return Object.values(data.peers ?? {});
+}
+
 export async function getMainData(
     url: string,
     sid: string,

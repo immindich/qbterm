@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import { getTorrentFiles, getTorrentProperties, type TorrentProperties, type TorrentFile } from "./api.js";
-import { formatBytes } from "./format.js";
+import { getTorrentFiles, getTorrentProperties, getTorrentPeers, type TorrentProperties, type TorrentFile, type TorrentPeer } from "./api.js";
+import { formatBytes, formatProgress } from "./format.js";
 
 function usePolling<T>(fetcher: () => Promise<T>, deps: unknown[], interval: number = 5000): T | null {
     const [data, setData] = useState<T | null>(null);
@@ -148,6 +148,35 @@ function Properties({ url, sid, hash }: InfoModeProps) {
     );
 }
 
+function countryFlag(code: string): string {
+    if (!code || code.length !== 2) return "  ";
+    return String.fromCodePoint(
+        code.toUpperCase().charCodeAt(0) - 0x41 + 0x1F1E6,
+        code.toUpperCase().charCodeAt(1) - 0x41 + 0x1F1E6,
+    );
+}
+
+function Peers({ url, sid, hash }: InfoModeProps) {
+    const peers = usePolling(() => getTorrentPeers(url, sid, hash), [url, sid, hash]);
+
+    return (
+        <Box flexDirection="column">
+            <Box>
+                <Box width={6}><Text bold>Flag</Text></Box>
+                <Box width={18}><Text bold>IP</Text></Box>
+                <Box width={10}><Text bold>Progress</Text></Box>
+            </Box>
+            {peers && peers.map((peer) => (
+                <Box key={`${peer.ip}:${peer.port}`}>
+                    <Box width={6}><Text>{countryFlag(peer.country_code)}</Text></Box>
+                    <Box width={18}><Text>{peer.ip}</Text></Box>
+                    <Box width={10}><Text>{formatProgress(peer.progress)}</Text></Box>
+                </Box>
+            ))}
+        </Box>
+    );
+}
+
 interface Mode {
     name: string;
     component: (props: InfoModeProps) => React.ReactNode;
@@ -156,6 +185,7 @@ interface Mode {
 const modes: Mode[] = [
     { name: "Properties", component: Properties },
     { name: "Content", component: Content },
+    { name: "Peers", component: Peers },
 ];
 
 interface InfoProps {
