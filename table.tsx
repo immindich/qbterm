@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, memo, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import type { TorrentInfo } from "./api.js";
-import { formatBytes, formatProgress, stateIcon, stateText } from "./format.js";
+import { formatBytes, formatProgress, formatDuration, stateIcon, stateText } from "./format.js";
 
 function padOrTruncate(str: string, width: number): string {
     if (str.length > width) return str.slice(0, width);
@@ -11,7 +11,7 @@ function padOrTruncate(str: string, width: number): string {
 interface Column {
     name: string;
     key: keyof TorrentInfo;
-    width: number;
+    width: number | { min: number };
     render: (torrent: TorrentInfo) => string;
     sort: ((a: TorrentInfo, b: TorrentInfo) => number) | null;
 }
@@ -20,18 +20,46 @@ let rawStatus = false;
 
 const columns: Column[] = [
     { name: "Name", key: "name", width: 20, render: (t) => stateIcon(t.state) + " " + t.name, sort: (a, b) => a.name.localeCompare(b.name) },
-    { name: "Size", key: "size", width: 10, render: (t) => formatBytes(t.size), sort: null },
-    { name: "Progress", key: "progress", width: 10, render: (t) => formatProgress(t.progress), sort: null },
-    { name: "Status", key: "state", width: 22, render: (t) => rawStatus ? t.state : stateText(t.state), sort: null },
-    { name: "Down Speed", key: "dlspeed", width: 12, render: (t) => formatBytes(t.dlspeed) + "/s", sort: null },
-    { name: "Up Speed", key: "upspeed", width: 10, render: (t) => formatBytes(t.upspeed) + "/s", sort: null },
+    { name: "Size", key: "size", width: 7, render: (t) => formatBytes(t.size), sort: null },
+    { name: "Progress", key: "progress", width: 8, render: (t) => formatProgress(t.progress), sort: null },
+    { name: "Status", key: "state", width: { min: 11 }, render: (t) => rawStatus ? t.state : stateText(t.state), sort: null },
+    { name: "Down", key: "dlspeed", width: 9, render: (t) => formatBytes(t.dlspeed) + "/s", sort: null },
+    { name: "Up", key: "upspeed", width: 9, render: (t) => formatBytes(t.upspeed) + "/s", sort: null },
+    { name: "Seeds", key: "num_seeds", width: 5, render: (t) => t.num_seeds.toString(), sort: null },
+    { name: "Peers", key: "num_leechs", width: 5, render: (t) => t.num_leechs.toString(), sort: null },
+    { name: "Ratio", key: "ratio", width: 5, render: (t) => t.ratio.toFixed(2), sort: null },
+    { name: "ETA", key: "eta", width: 5, render: (t) => {
+        switch (t.state) {
+            case "downloading":
+            case "forcedDL":
+            case "metaDL":
+            case "forcedMetaDL":
+                return formatDuration(t.eta);
+            default:
+                return "";
+        }
+    }, sort: null },
 ];
 
 export function setRawStatus(value: boolean) {
     rawStatus = value;
 }
 
-const tableWidth = 2 + columns.reduce((sum, col) => sum + col.width, 0) + (columns.length - 1);
+function resolveWidths(torrents: TorrentInfo[]): number[] {
+    return columns.map((col) => {
+        if (typeof col.width === "number") return col.width;
+        let max = col.width.min;
+        for (const t of torrents) {
+            const len = col.render(t).length;
+            if (len > max) max = len;
+        }
+        return Math.max(max, col.name.length + 2); // +2 for sort indicator
+    });
+}
+
+function computeTableWidth(widths: number[]): number {
+    return widths.reduce((sum, w) => sum + w, 0) + (columns.length - 1);
+}
 
 function viewSlice(line: string, scrollX: number, screenWidth: number): string {
     return line.slice(scrollX, scrollX + screenWidth);
@@ -42,10 +70,11 @@ interface TableRowProps {
     selected: boolean;
     scrollX: number;
     screenWidth: number;
+    widths: number[];
 }
 
-const TableRow = memo(function TableRow({ torrent, selected, scrollX, screenWidth }: TableRowProps) {
-    const line = "  " + columns.map((col) => padOrTruncate(col.render(torrent), col.width)).join(" ");
+const TableRow = memo(function TableRow({ torrent, selected, scrollX, screenWidth, widths }: TableRowProps) {
+    const line = columns.map((col, i) => padOrTruncate(col.render(torrent), widths[i])).join(" ");
     return <Text inverse={selected}>{viewSlice(line, scrollX, screenWidth)}</Text>;
 });
 
@@ -55,12 +84,13 @@ interface TableHeaderProps {
     sorting: boolean;
     scrollX: number;
     screenWidth: number;
+    widths: number[];
 }
 
-function TableHeader({ sort_column, sort_ascending, sorting, scrollX, screenWidth }: TableHeaderProps) {
-    const line = "  " + columns.map((col, i) => {
+function TableHeader({ sort_column, sort_ascending, sorting, scrollX, screenWidth, widths }: TableHeaderProps) {
+    const line = columns.map((col, i) => {
         const label = col.name + (i === sort_column ? (sort_ascending ? " ▲" : " ▼") : "");
-        return padOrTruncate(label, col.width);
+        return padOrTruncate(label, widths[i]);
     }).join(" ");
 
     if (!sorting) {
@@ -69,11 +99,10 @@ function TableHeader({ sort_column, sort_ascending, sorting, scrollX, screenWidt
 
     // In sorting mode, highlight the active column
     const parts: { text: string; active: boolean }[] = [];
-    let pos = 2; // leading "  "
-    parts.push({ text: viewSlice("  ", scrollX, screenWidth), active: false });
+    let pos = 0;
     columns.forEach((col, i) => {
         const label = col.name + (i === sort_column ? (sort_ascending ? " ▲" : " ▼") : "");
-        const cell = padOrTruncate(label, col.width);
+        const cell = padOrTruncate(label, widths[i]);
         const separator = i < columns.length - 1 ? " " : "";
         const chunk = cell + separator;
         const visible = viewSlice(chunk, Math.max(0, scrollX - pos), screenWidth);
@@ -115,6 +144,8 @@ export function Table({ torrents, sorting, maxRows, screenWidth, onSelectionChan
     const [selectedTorrent, setSelectedTorrent] = useState<string | null>(null);
 
     const sorted = useMemo(() => sortTorrents(torrents, sortColumn, sortAscending), [torrents, sortColumn, sortAscending]);
+    const widths = useMemo(() => resolveWidths(sorted), [sorted]);
+    const tableWidth = useMemo(() => computeTableWidth(widths), [widths]);
 
     // Preserve selection when data changes; fall back to first item if selected was removed
     const selectedIndex = useMemo(() => {
@@ -189,9 +220,9 @@ export function Table({ torrents, sorting, maxRows, screenWidth, onSelectionChan
 
     return (
         <Box flexDirection="column">
-            <TableHeader sort_column={sortColumn} sort_ascending={sortAscending} sorting={sorting} scrollX={scrollX} screenWidth={screenWidth} />
+            <TableHeader sort_column={sortColumn} sort_ascending={sortAscending} sorting={sorting} scrollX={scrollX} screenWidth={screenWidth} widths={widths} />
             <Text>{"─".repeat(screenWidth)}</Text>
-            {visible.map((torrent) => <TableRow torrent={torrent} key={torrent.hash} selected={torrent.hash === effectiveHash} scrollX={scrollX} screenWidth={screenWidth} />)}
+            {visible.map((torrent) => <TableRow torrent={torrent} key={torrent.hash} selected={torrent.hash === effectiveHash} scrollX={scrollX} screenWidth={screenWidth} widths={widths} />)}
         </Box>
     )
 }

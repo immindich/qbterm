@@ -2,7 +2,19 @@ export function formatBytes(bytes: number): string {
     if (bytes === 0) return "0 B";
     const units = ["B", "KB", "MB", "GB", "TB"];
     const index = Math.floor(Math.log(bytes) / Math.log(1024));
-    return (bytes / Math.pow(1024, index)).toFixed(1) + " " + units[index];
+    const value = bytes / Math.pow(1024, index);
+    return value.toPrecision(3).replace(/\.?0+$/, "") + " " + units[index];
+}
+
+export function formatDuration(seconds: number): string {
+    if (seconds < 0 || !isFinite(seconds)) return "∞";
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (h < 24) return `${h}h ${m}m`;
+    const d = Math.floor(h / 24);
+    return `${d}d ${h % 24}h`;
 }
 
 export function formatProgress(progress: number): string {
