@@ -208,6 +208,15 @@ export async function stopTorrents(url: string, sid: string, hashes: string[]): 
     if (!response.ok) throw new HttpError(response.status, `Failed to stop torrent: HTTP ${response.status}`);
 }
 
+export async function deleteTorrents(url: string, sid: string, hashes: string[], deleteFiles: boolean): Promise<void> {
+    const response = await loggedFetch(`${url}/api/v2/torrents/delete`, {
+        method: "POST",
+        headers: { Cookie: `SID=${sid}`, "Content-Type": "application/x-www-form-urlencoded" },
+        body: `hashes=${hashes.join("|")}&deleteFiles=${deleteFiles}`,
+    });
+    if (!response.ok) throw new HttpError(response.status, `Failed to delete torrent: HTTP ${response.status}`);
+}
+
 export async function startTorrents(url: string, sid: string, hashes: string[]): Promise<void> {
     const response = await loggedFetch(`${url}/api/v2/torrents/start`, {
         method: "POST",

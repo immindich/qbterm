@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Box, Text, useInput, useApp, useStdout } from "ink";
-import { getMainData, stopTorrents, startTorrents, HttpError, TransferInfo, type TorrentInfo } from "./api.js";
+import { getMainData, stopTorrents, startTorrents, deleteTorrents, HttpError, TransferInfo, type TorrentInfo } from "./api.js";
 import { formatBytes } from "./format.js";
 import { Table, setRawStatus } from "./table.js";
 import { AddTorrentForm } from "./add-torrent-form.js";
@@ -47,7 +47,7 @@ interface AppState {
     server_state: TransferInfo;
 }
 
-type Mode = "normal" | "sorting" | "add-torrent" | "info";
+type Mode = "normal" | "sorting" | "add-torrent" | "info" | "confirm-delete";
 
 interface AppProps {
     url: string;
@@ -64,6 +64,7 @@ export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp, onSes
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [mode, setMode] = useState<Mode>("normal");
     const [selectedTorrent, setSelectedTorrent] = useState<string | null>(null);
+    const [deleteFiles, setDeleteFiles] = useState(false);
     const ridRef = useRef(0);
     const fetchIdRef = useRef(0);
     const { columns: screenWidth, rows: screenRows } = useTerminalSize();
@@ -159,6 +160,26 @@ export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp, onSes
                 const action = stopped ? startTorrents : stopTorrents;
                 action(url, sid, [torrent.hash]).catch(() => {});
             }
+
+            if (input === "d" || key.delete) {
+                if (state === null || selectedTorrent === null) return;
+                if (!state.torrents[selectedTorrent]) return;
+                setDeleteFiles(false);
+                setMode("confirm-delete");
+            }
+        } else if (mode === "confirm-delete") {
+            if (input === "y" || key.return) {
+                if (selectedTorrent) {
+                    deleteTorrents(url, sid, [selectedTorrent], deleteFiles).catch(() => {});
+                }
+                setMode("normal");
+            }
+            if (input === "n" || key.escape) {
+                setMode("normal");
+            }
+            if (input === " ") {
+                setDeleteFiles((prev) => !prev);
+            }
         } else if (mode === "add-torrent") {
             if (key.escape) {
                 setMode("normal");
@@ -191,13 +212,20 @@ export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp, onSes
         ? [["Tab", "switch field"], ["Esc", "close"]]
         : mode === "info"
         ? [["Tab", "switch tab"], ["Esc", "back"]]
-        : [["↑↓", "navigate"], ["←→", "scroll"], ["PgUp/PgDn", "page"], ["Home/End", "jump"], ["s", "sort"], ["t", "add torrent"], ["p", "pause/resume"], ["q", "quit"]];
+        : mode === "confirm-delete"
+        ? [["y", "confirm"], ["n", "cancel"], ["Space", "toggle"]]
+        : [["↑↓", "navigate"], ["←→", "scroll"], ["PgUp/PgDn", "page"], ["Home/End", "jump"], ["s", "sort"], ["t", "add torrent"], ["p", "pause/resume"], ["d", "delete"], ["q", "quit"]];
 
     return (
         <Box width={screenWidth} height={screenRows} flexDirection="column">
             <Box flexGrow={1} flexDirection="column">
                 {mode === "add-torrent"
                     ? <AddTorrentForm serverUrl={url} sid={sid} defaultSavePath={defaultSavePath} onClose={() => setMode("normal")} />
+                    : mode === "confirm-delete" && selectedTorrent && state.torrents[selectedTorrent]
+                    ? <Box flexDirection="column" gap={1}>
+                        <Text>Delete &quot;{state.torrents[selectedTorrent].name}&quot;?</Text>
+                        <Text><Text inverse>[{deleteFiles ? "✓" : " "}]</Text> Delete content files</Text>
+                    </Box>
                     : mode === "info" && selectedTorrent
                     ? <Info url={url} name={state.torrents[selectedTorrent].name} sid={sid} hash={selectedTorrent} width={screenWidth} height={maxRows + 2} />
                     : <Table torrents={state.torrents} sorting={mode === "sorting"} maxRows={maxRows} screenWidth={screenWidth} onSelectionChange={setSelectedTorrent} />
