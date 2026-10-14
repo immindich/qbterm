@@ -2,3 +2,5 @@ node_modules
 config.toml
 dist
 .vscode
+bench/tmp
+bench/profiles
