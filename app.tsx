@@ -92,20 +92,16 @@ export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp, onSes
         ridRef.current = data.rid;
 
         setState((prev) => {
-            let torrents = prev?.torrents ?? {};
-
-            if (data.full_update) {
-                torrents = {};
-            }
+            // Copy the map once per update, then mutate the copy; copying per torrent is O(n^2).
+            const torrents: Record<string, TorrentInfo> = data.full_update ? {} : { ...prev?.torrents };
 
             if (data.torrents) {
                 for (const [hash, partial] of Object.entries(data.torrents)) {
-                    torrents = { ...torrents, [hash]: { ...torrents[hash], ...partial, hash } as TorrentInfo };
+                    torrents[hash] = { ...torrents[hash], ...partial, hash } as TorrentInfo;
                 }
             }
 
             if (data.torrents_removed) {
-                torrents = { ...torrents };
                 for (const hash of data.torrents_removed) {
                     delete torrents[hash];
                 }
