@@ -98,7 +98,9 @@ export async function authenticate(
     }
 
     const setCookie = response.headers.get("set-cookie");
-    const match = setCookie && setCookie.match(/SID=([^;]+)/);
+    // Older versions name the cookie "SID"; newer ones use "QBT_SID_<port>".
+    // Return the whole "name=value" pair so it can be sent back verbatim.
+    const match = setCookie && setCookie.match(/(?:^|[;,]\s*)((?:QBT_SID_\d+|SID)=[^;]+)/);
     if (!match) {
         throw new Error("Authentication failed: no SID cookie in response");
     }
@@ -111,7 +113,7 @@ export async function getDefaultSavePath(
     sid: string,
 ): Promise<string> {
     const response = await loggedFetch(`${url}/api/v2/app/defaultSavePath`, {
-        headers: { Cookie: `SID=${sid}` },
+        headers: { Cookie: sid },
     });
 
     if (!response.ok) {
@@ -129,7 +131,7 @@ export async function getTorrents(
     const response = await loggedFetch(
         `${url}/api/v2/torrents/info?filter=${filter}`,
         {
-            headers: { Cookie: `SID=${sid}` },
+            headers: { Cookie: sid },
         },
     );
 
@@ -185,7 +187,7 @@ export async function addTorrents(
 
     const response = await loggedFetch(`${url}/api/v2/torrents/add`, {
         method: "POST",
-        headers: { Cookie: `SID=${sid}` },
+        headers: { Cookie: sid },
         body: form,
     });
 
@@ -202,7 +204,7 @@ export async function addTorrents(
 export async function stopTorrents(url: string, sid: string, hashes: string[]): Promise<void> {
     const response = await loggedFetch(`${url}/api/v2/torrents/stop`, {
         method: "POST",
-        headers: { Cookie: `SID=${sid}`, "Content-Type": "application/x-www-form-urlencoded" },
+        headers: { Cookie: sid, "Content-Type": "application/x-www-form-urlencoded" },
         body: `hashes=${hashes.join("|")}`,
     });
     if (!response.ok) throw new HttpError(response.status, `Failed to stop torrent: HTTP ${response.status}`);
@@ -211,7 +213,7 @@ export async function stopTorrents(url: string, sid: string, hashes: string[]): 
 export async function deleteTorrents(url: string, sid: string, hashes: string[], deleteFiles: boolean): Promise<void> {
     const response = await loggedFetch(`${url}/api/v2/torrents/delete`, {
         method: "POST",
-        headers: { Cookie: `SID=${sid}`, "Content-Type": "application/x-www-form-urlencoded" },
+        headers: { Cookie: sid, "Content-Type": "application/x-www-form-urlencoded" },
         body: `hashes=${hashes.join("|")}&deleteFiles=${deleteFiles}`,
     });
     if (!response.ok) throw new HttpError(response.status, `Failed to delete torrent: HTTP ${response.status}`);
@@ -220,7 +222,7 @@ export async function deleteTorrents(url: string, sid: string, hashes: string[],
 export async function startTorrents(url: string, sid: string, hashes: string[]): Promise<void> {
     const response = await loggedFetch(`${url}/api/v2/torrents/start`, {
         method: "POST",
-        headers: { Cookie: `SID=${sid}`, "Content-Type": "application/x-www-form-urlencoded" },
+        headers: { Cookie: sid, "Content-Type": "application/x-www-form-urlencoded" },
         body: `hashes=${hashes.join("|")}`,
     });
     if (!response.ok) throw new HttpError(response.status, `Failed to start torrent: HTTP ${response.status}`);
@@ -249,7 +251,7 @@ export async function getTorrentFiles(
     const response = await loggedFetch(
         `${url}/api/v2/torrents/files?${params}`,
         {
-            headers: { Cookie: `SID=${sid}` },
+            headers: { Cookie: sid },
         },
     );
 
@@ -305,7 +307,7 @@ export async function getTorrentProperties(
     const response = await loggedFetch(
         `${url}/api/v2/torrents/properties?hash=${hash}`,
         {
-            headers: { Cookie: `SID=${sid}` },
+            headers: { Cookie: sid },
         },
     );
 
@@ -343,7 +345,7 @@ export async function getTorrentPeers(
     const response = await loggedFetch(
         `${url}/api/v2/sync/torrentPeers?hash=${hash}&rid=0`,
         {
-            headers: { Cookie: `SID=${sid}` },
+            headers: { Cookie: sid },
         },
     );
 
@@ -363,7 +365,7 @@ export async function getMainData(
     const response = await loggedFetch(
         `${url}/api/v2/sync/maindata?rid=${rid}`,
         {
-            headers: { Cookie: `SID=${sid}` },
+            headers: { Cookie: sid },
         },
     );
 
