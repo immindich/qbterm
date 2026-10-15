@@ -321,8 +321,9 @@ export async function getTorrentProperties(
 export interface TorrentPeer {
     client: string;
     connection: string;
-    country: string;
-    country_code: string;
+    // Only present when "Resolve peer countries" is enabled in qBittorrent
+    country?: string;
+    country_code?: string;
     dl_speed: number;
     ip: string;
     port: number;

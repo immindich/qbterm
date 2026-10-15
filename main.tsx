@@ -13,6 +13,9 @@ interface Config {
         username?: string;
         password?: string;
     };
+    ui?: {
+        help_bar?: boolean;
+    };
     debug?: {
         raw_status?: boolean;
         log?: boolean;
@@ -39,9 +42,10 @@ interface RootProps {
     defaultUsername?: string;
     defaultPassword?: string;
     rawStatus?: boolean;
+    showHelpBar?: boolean;
 }
 
-function Root({ defaultUrl, defaultUsername, defaultPassword, rawStatus }: RootProps) {
+function Root({ defaultUrl, defaultUsername, defaultPassword, rawStatus, showHelpBar }: RootProps) {
     const [session, setSession] = useState<{ url: string; sid: string; defaultSavePath: string } | null>(null);
     const [credentials, setCredentials] = useState<{ url: string; username: string; password: string } | null>(null);
     const [autoLoginFailed, setAutoLoginFailed] = useState(false);
@@ -86,7 +90,7 @@ function Root({ defaultUrl, defaultUsername, defaultPassword, rawStatus }: RootP
         return <Login defaultUrl={defaultUrl} defaultUsername={defaultUsername} message={loginMessage ?? undefined} onLogin={handleLogin} />;
     }
 
-    return <App url={session.url} sid={session.sid} defaultSavePath={session.defaultSavePath} rawStatus={rawStatus} onSessionExpired={handleSessionExpired} />;
+    return <App url={session.url} sid={session.sid} defaultSavePath={session.defaultSavePath} rawStatus={rawStatus} showHelpBar={showHelpBar} onSessionExpired={handleSessionExpired} />;
 }
 
 const config = loadConfig();
@@ -96,4 +100,4 @@ if (config.debug?.log) {
     enableDebugLog();
 }
 
-render(<Root defaultUrl={conn?.url} defaultUsername={conn?.username} defaultPassword={conn?.password} rawStatus={config.debug?.raw_status} />);
+render(<Root defaultUrl={conn?.url} defaultUsername={conn?.username} defaultPassword={conn?.password} rawStatus={config.debug?.raw_status} showHelpBar={config.ui?.help_bar} />);

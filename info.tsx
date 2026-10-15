@@ -149,7 +149,7 @@ function Properties({ url, sid, hash, maxRows }: InfoModeProps) {
     );
 }
 
-function countryFlag(code: string): string {
+function countryFlag(code: string | undefined): string {
     if (!code || code.length !== 2) return "  ";
     return String.fromCodePoint(
         code.toUpperCase().charCodeAt(0) - 0x41 + 0x1F1E6,

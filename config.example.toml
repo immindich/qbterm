@@ -3,6 +3,9 @@ url = "http://localhost:8080"
 username = "admin"
 password = "adminadmin"
 
+# [ui]
+# help_bar = false  # hide the key help line at the bottom (the status bar stays)
+
 # [debug]
 # raw_status = true
 # log = true

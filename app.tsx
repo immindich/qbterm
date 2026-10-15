@@ -56,10 +56,11 @@ interface AppProps {
     sid: string;
     defaultSavePath: string;
     rawStatus?: boolean;
+    showHelpBar?: boolean;
     onSessionExpired: () => void;
 }
 
-export function App({ url, sid, defaultSavePath, rawStatus = false, onSessionExpired }: AppProps) {
+export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar = true, onSessionExpired }: AppProps) {
     const [state, setState] = useState<AppState | null>(null);
     const [errored, setErrored] = useState<boolean>(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -81,8 +82,8 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, onSessionExp
         const { height } = measureElement(contentRef.current);
         if (height !== measuredContentHeight) setMeasuredContentHeight(height);
     });
-    // Until the first measurement, assume a three-line footer
-    const contentHeight = measuredContentHeight ?? screenRows - 3;
+    // Until the first measurement, assume the footer doesn't wrap (separator, status bar, help bar)
+    const contentHeight = measuredContentHeight ?? screenRows - (showHelpBar ? 3 : 2);
     const maxRows = contentHeight - 2; // table header and separator
 
     const { exit } = useApp();
@@ -259,7 +260,7 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, onSessionExp
                 ? <Text color="red">{errorMessage}</Text>
                 : <StatusBar dl_info_speed={state.server_state?.dl_info_speed ?? 0} dl_info_data={state.server_state?.dl_info_data ?? 0} up_info_speed={state.server_state?.up_info_speed ?? 0} up_info_data={state.server_state?.up_info_data ?? 0} screenWidth={screenWidth} />
             }
-            <HelpBar keys={helpKeys} />
+            {showHelpBar && <HelpBar keys={helpKeys} />}
         </Box>
     );
 }
