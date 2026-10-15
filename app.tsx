@@ -3,6 +3,8 @@ import { Box, Text, useInput, useApp, useStdout, measureElement, type DOMElement
 import { getMainData, stopTorrents, startTorrents, deleteTorrents, HttpError, TransferInfo, type TorrentInfo } from "./api.js";
 import { formatBytes } from "./format.js";
 import { Table, sortTorrents, findSelectedIndex, columnCount } from "./table.js";
+import { SearchBar } from "./search-bar.js";
+import { parseQuery, filterTorrents } from "./search.js";
 import { AddTorrentForm } from "./add-torrent-form.js";
 import { Info } from "./info.js";
 
@@ -49,7 +51,7 @@ interface AppState {
 
 const NO_TORRENTS: Record<string, TorrentInfo> = {};
 
-type Mode = "normal" | "sorting" | "add-torrent" | "info" | "confirm-delete";
+type Mode = "normal" | "sorting" | "search" | "add-torrent" | "info" | "confirm-delete";
 
 interface AppProps {
     url: string;
@@ -68,6 +70,10 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
     const [selection, setSelection] = useState<string | null>(null);
     const [sortColumn, setSortColumn] = useState(0);
     const [sortAscending, setSortAscending] = useState(true);
+    // The search filter applies across modes; "search" mode is only for editing it.
+    // queryBeforeEdit is restored if the edit is cancelled.
+    const [query, setQuery] = useState("");
+    const [queryBeforeEdit, setQueryBeforeEdit] = useState("");
     const [deleteFiles, setDeleteFiles] = useState(false);
     const ridRef = useRef(0);
     const fetchIdRef = useRef(0);
@@ -88,7 +94,11 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
 
     const { exit } = useApp();
 
-    const sorted = useMemo(() => sortTorrents(state?.torrents ?? NO_TORRENTS, sortColumn, sortAscending), [state?.torrents, sortColumn, sortAscending]);
+    const allTorrents = useMemo(() => Object.values(state?.torrents ?? NO_TORRENTS), [state?.torrents]);
+    const searchTerms = useMemo(() => parseQuery(query), [query]);
+    const filterActive = searchTerms.length > 0;
+    const filtered = useMemo(() => filterTorrents(allTorrents, searchTerms), [allTorrents, searchTerms]);
+    const sorted = useMemo(() => sortTorrents(filtered, sortColumn, sortAscending), [filtered, sortColumn, sortAscending]);
     // The stored selection can point at a removed torrent; the effective one falls back to the first row
     const selectedIndex = useMemo(() => findSelectedIndex(sorted, selection), [sorted, selection]);
     const selectedTorrent = sorted[selectedIndex]?.hash ?? null;
@@ -165,8 +175,17 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
                 setMode("add-torrent");
             }
 
-            if (key.return) {
+            if (key.return && selectedTorrent !== null) {
                 setMode("info");
+            }
+
+            if (input === "/") {
+                setQueryBeforeEdit(query);
+                setMode("search");
+            }
+
+            if (key.escape && query !== "") {
+                setQuery("");
             }
 
             if (input === "p") {
@@ -196,6 +215,16 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
             }
             if (input === " ") {
                 setDeleteFiles((prev) => !prev);
+            }
+        } else if (mode === "search") {
+            // Typing is handled by the search bar's text input
+            if (key.return) {
+                if (!filterActive) setQuery("");
+                setMode("normal");
+            }
+            if (key.escape) {
+                setQuery(queryBeforeEdit);
+                setMode("normal");
             }
         } else if (mode === "add-torrent") {
             if (key.escape) {
@@ -238,7 +267,13 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
         ? [["Tab", "switch tab"], ["Esc", "back"]]
         : mode === "confirm-delete"
         ? [["y", "confirm"], ["n", "cancel"], ["Space", "toggle"]]
-        : [["↑↓", "navigate"], ["←→", "scroll"], ["PgUp/PgDn", "page"], ["Home/End", "jump"], ["s", "sort"], ["t", "add torrent"], ["p", "pause/resume"], ["d", "delete"], ["q", "quit"]];
+        : mode === "search"
+        ? [["Enter", "apply"], ["Esc", "cancel"], ["↑↓", "navigate"]]
+        : [["↑↓", "navigate"], ["←→", "scroll"], ["PgUp/PgDn", "page"], ["Home/End", "jump"],
+            ["/", filterActive ? "edit search" : "search"], ...(filterActive ? [["Esc", "clear filter"] as [string, string]] : []),
+            ["s", "sort"], ["t", "add torrent"], ["p", "pause/resume"], ["d", "delete"], ["q", "quit"]];
+
+    const showSearchBar = mode === "search" || (filterActive && (mode === "normal" || mode === "sorting"));
 
     return (
         <Box width={screenWidth} height={screenRows} flexDirection="column">
@@ -252,10 +287,13 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
                     </Box>
                     : mode === "info" && selectedTorrent
                     ? <Info url={url} name={state.torrents[selectedTorrent].name} sid={sid} hash={selectedTorrent} width={screenWidth} height={contentHeight} />
-                    : <Table sorted={sorted} selectedIndex={selectedIndex} sortColumn={sortColumn} sortAscending={sortAscending} sorting={mode === "sorting"} maxRows={maxRows} screenWidth={screenWidth} rawStatus={rawStatus} onSelectionChange={setSelection} />
+                    : <Table sorted={sorted} widthTorrents={allTorrents} selectedIndex={selectedIndex} sortColumn={sortColumn} sortAscending={sortAscending}
+                        sorting={mode === "sorting"} maxRows={maxRows} screenWidth={screenWidth} rawStatus={rawStatus} textInputActive={mode === "search"}
+                        emptyMessage={filterActive ? `No torrents match "${query.trim()}"` : undefined} onSelectionChange={setSelection} />
                 }
             </Box>
             <Text>{"─".repeat(screenWidth)}</Text>
+            {showSearchBar && <SearchBar editing={mode === "search"} query={query} onChange={setQuery} matchCount={sorted.length} totalCount={allTorrents.length} screenWidth={screenWidth} />}
             {errored
                 ? <Text color="red">{errorMessage}</Text>
                 : <StatusBar dl_info_speed={state.server_state?.dl_info_speed ?? 0} dl_info_data={state.server_state?.dl_info_data ?? 0} up_info_speed={state.server_state?.up_info_speed ?? 0} up_info_data={state.server_state?.up_info_data ?? 0} screenWidth={screenWidth} />

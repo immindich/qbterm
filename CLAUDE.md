@@ -33,6 +33,8 @@ Copy `config.example.toml` to `config.toml` in the project directory and fill in
 - `table.tsx` — Torrent list table rendering and scrolling, plus column definitions and sort helpers (sort and selection state live in `app.tsx`)
 - `info.tsx` — Torrent detail view with tabs (Properties, Content, Peers)
 - `format.ts` — Display formatting utilities (bytes, duration, progress, state)
+- `search.ts` — Search matching: names and queries are compared with case, accents and separators removed; every query word must appear in the name
+- `search-bar.tsx` — Search input line and the "Filter" indicator shown while a search is applied
 - `add-torrent-form.tsx` — Form for adding torrents by URL
 - `login.tsx` — Login form
 - `form.tsx` — Reusable form component (text inputs and checkboxes)
@@ -42,7 +44,7 @@ Copy `config.example.toml` to `config.toml` in the project directory and fill in
 
 ## Architecture
 
-The app uses a mode system (`normal`, `sorting`, `add-torrent`, `info`) managed in `app.tsx`. Data is fetched via incremental polling (`getMainData` with RID) every 1s. The info view has its own tab system with `usePolling` for per-mode data fetching at 5s intervals.
+The app uses a mode system (`normal`, `sorting`, `search`, `add-torrent`, `info`, `confirm-delete`) managed in `app.tsx`. The search query is separate from the mode: `search` mode is only for editing it, and the filter stays applied in the other modes. `App` derives the visible list as torrents → filter → sort → selection. Data is fetched via incremental polling (`getMainData` with RID) every 1s. The info view has its own tab system with `usePolling` for per-mode data fetching at 5s intervals.
 
 Table columns support fixed widths (`width: number`) or variable widths (`width: { min: number }`) that grow to fit content.
 
@@ -58,6 +60,7 @@ bench/cpu.sh 10 100 5000        # custom duration (seconds) and torrent counts
 bench/profile.sh 2000 20        # V8 CPU profile; prints hottest functions, keeps raw profile in bench/profiles/
 bench/terminal-output.sh 500 10 # bytes written to the terminal and number of full-screen clears
 bench/scroll.sh 10 30 500 2000  # CPU while holding an arrow key (30 keys/s) vs. idle, at 500 and 2000 torrents
+bench/search.sh 10 10 500 2000  # CPU while typing a search query (10 keys/s) vs. idle
 ```
 
 The scripts use a 200x50 terminal; set `BENCH_COLS`/`BENCH_ROWS` to change it. Ink redraws the whole frame on every render, so rendering cost grows with terminal size.
@@ -88,3 +91,4 @@ We connect to qBittorrent with the WebUI API. The documentation can be found [he
 - Use ESM (`import`/`export`)
 - Entry point is `main.tsx` (compiles to `dist/main.js`)
 - Run `npm test` to typecheck without emitting
+- Run `npm run test:unit` to build and run the unit tests in `test/` (TypeScript, using Node's built-in test runner; compiled to `dist/test/`)

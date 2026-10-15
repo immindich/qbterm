@@ -120,11 +120,11 @@ function TableHeader({ sort_column, sort_ascending, sorting, scrollX, screenWidt
     );
 }
 
-export function sortTorrents(torrents: Record<string, TorrentInfo>, sort_column: number, sort_ascending: boolean): TorrentInfo[] {
+export function sortTorrents(torrents: TorrentInfo[], sort_column: number, sort_ascending: boolean): TorrentInfo[] {
     const col = columns[sort_column];
     const dir = sort_ascending ? 1 : -1;
     const compare = col.sort ?? ((a: TorrentInfo, b: TorrentInfo) => (a[col.key] as number) - (b[col.key] as number));
-    return Object.values(torrents).sort((a, b) => compare(a, b) * dir);
+    return [...torrents].sort((a, b) => compare(a, b) * dir);
 }
 
 // Index of the selected torrent in the sorted list; falls back to the first row if it's gone
@@ -135,6 +135,9 @@ export function findSelectedIndex(sorted: TorrentInfo[], selected: string | null
 
 export interface TableProps {
     sorted: TorrentInfo[];
+    // Column widths are sized to fit these (all torrents, not just the filtered ones,
+    // so columns don't shift while a search is typed)
+    widthTorrents: TorrentInfo[];
     selectedIndex: number;
     sortColumn: number;
     sortAscending: boolean;
@@ -142,21 +145,24 @@ export interface TableProps {
     maxRows: number;
     screenWidth: number;
     rawStatus: boolean;
+    // While a text input is focused, leave ←→ and Home/End to it
+    textInputActive: boolean;
+    emptyMessage?: string;
     onSelectionChange: (hash: string) => void;
 }
 
-export function Table({ sorted, selectedIndex, sortColumn, sortAscending, sorting, maxRows, screenWidth, rawStatus, onSelectionChange }: TableProps) {
+export function Table({ sorted, widthTorrents, selectedIndex, sortColumn, sortAscending, sorting, maxRows, screenWidth, rawStatus, textInputActive, emptyMessage, onSelectionChange }: TableProps) {
     const scrollOffsetRef = useRef(0);
     const [scrollX, setScrollX] = useState(0);
 
-    const widths = useMemo(() => resolveWidths(sorted, rawStatus), [sorted, rawStatus]);
+    const widths = useMemo(() => resolveWidths(widthTorrents, rawStatus), [widthTorrents, rawStatus]);
     const tableWidth = useMemo(() => computeTableWidth(widths), [widths]);
 
     const selectedHash = sorted[selectedIndex]?.hash ?? null;
 
     useInput((_input, key) => {
         // Horizontal scroll
-        const scrollXDelta = key.rightArrow ? 4 : key.leftArrow ? -4 : 0;
+        const scrollXDelta = textInputActive ? 0 : key.rightArrow ? 4 : key.leftArrow ? -4 : 0;
         if (scrollXDelta !== 0) {
             setScrollX((prev) => {
                 const maxScrollX = Math.max(0, tableWidth - screenWidth);
@@ -165,7 +171,8 @@ export function Table({ sorted, selectedIndex, sortColumn, sortAscending, sortin
         }
 
         // Navigation
-        const delta = key.upArrow ? -1 : key.downArrow ? 1 : key.pageUp ? -maxRows : key.pageDown ? maxRows : key.home ? -Infinity : key.end ? Infinity : 0;
+        const delta = key.upArrow ? -1 : key.downArrow ? 1 : key.pageUp ? -maxRows : key.pageDown ? maxRows
+            : textInputActive ? 0 : key.home ? -Infinity : key.end ? Infinity : 0;
         if (delta !== 0) {
             const len = sorted.length;
             if (len === 0) return;
@@ -192,6 +199,7 @@ export function Table({ sorted, selectedIndex, sortColumn, sortAscending, sortin
         <Box flexDirection="column">
             <TableHeader sort_column={sortColumn} sort_ascending={sortAscending} sorting={sorting} scrollX={scrollX} screenWidth={screenWidth} widths={widths} />
             <Text>{"─".repeat(screenWidth)}</Text>
+            {visible.length === 0 && emptyMessage && <Text dimColor>{emptyMessage}</Text>}
             {visible.map((torrent) => <TableRow torrent={torrent} key={torrent.hash} selected={torrent.hash === selectedHash} scrollX={scrollX} screenWidth={screenWidth} widths={widths} rawStatus={rawStatus} />)}
         </Box>
     )
