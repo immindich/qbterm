@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, memo, useMemo } from "react";
+import { useState, useRef, memo, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import type { TorrentInfo } from "./api.js";
 import { formatBytes, formatProgress, formatDuration, stateIcon, stateText } from "./format.js";
@@ -38,6 +38,8 @@ const columns: Column[] = [
         }
     }, sort: null },
 ];
+
+export const columnCount = columns.length;
 
 function resolveWidths(torrents: TorrentInfo[], rawStatus: boolean): number[] {
     return columns.map((col) => {
@@ -116,58 +118,41 @@ function TableHeader({ sort_column, sort_ascending, sorting, scrollX, screenWidt
     );
 }
 
-function sortTorrents(torrents: Record<string, TorrentInfo>, sort_column: number, sort_ascending: boolean): TorrentInfo[] {
+export function sortTorrents(torrents: Record<string, TorrentInfo>, sort_column: number, sort_ascending: boolean): TorrentInfo[] {
     const col = columns[sort_column];
     const dir = sort_ascending ? 1 : -1;
     const compare = col.sort ?? ((a: TorrentInfo, b: TorrentInfo) => (a[col.key] as number) - (b[col.key] as number));
     return Object.values(torrents).sort((a, b) => compare(a, b) * dir);
 }
 
+// Index of the selected torrent in the sorted list; falls back to the first row if it's gone
+export function findSelectedIndex(sorted: TorrentInfo[], selected: string | null): number {
+    const idx = selected === null ? -1 : sorted.findIndex((t) => t.hash === selected);
+    return idx === -1 ? 0 : idx;
+}
+
 export interface TableProps {
-    torrents: Record<string, TorrentInfo>;
+    sorted: TorrentInfo[];
+    selectedIndex: number;
+    sortColumn: number;
+    sortAscending: boolean;
     sorting: boolean;
     maxRows: number;
     screenWidth: number;
     rawStatus: boolean;
-    onSelectionChange: (hash: string | null) => void;
+    onSelectionChange: (hash: string) => void;
 }
 
-export function Table({ torrents, sorting, maxRows, screenWidth, rawStatus, onSelectionChange }: TableProps) {
+export function Table({ sorted, selectedIndex, sortColumn, sortAscending, sorting, maxRows, screenWidth, rawStatus, onSelectionChange }: TableProps) {
     const scrollOffsetRef = useRef(0);
     const [scrollX, setScrollX] = useState(0);
-    const [sortColumn, setSortColumn] = useState(0);
-    const [sortAscending, setSortAscending] = useState(true);
-    const [selectedTorrent, setSelectedTorrent] = useState<string | null>(null);
 
-    const sorted = useMemo(() => sortTorrents(torrents, sortColumn, sortAscending), [torrents, sortColumn, sortAscending]);
     const widths = useMemo(() => resolveWidths(sorted, rawStatus), [sorted, rawStatus]);
     const tableWidth = useMemo(() => computeTableWidth(widths), [widths]);
 
-    // Preserve selection when data changes; fall back to first item if selected was removed
-    const selectedIndex = useMemo(() => {
-        if (selectedTorrent !== null && torrents[selectedTorrent] !== undefined) {
-            const idx = sorted.findIndex((t) => t.hash === selectedTorrent);
-            if (idx !== -1) return idx;
-        }
-        return 0;
-    }, [sorted, selectedTorrent, torrents]);
+    const selectedHash = sorted[selectedIndex]?.hash ?? null;
 
-    const effectiveHash = sorted[selectedIndex]?.hash ?? null;
-
-    useEffect(() => {
-        if (effectiveHash !== selectedTorrent) {
-            setSelectedTorrent(effectiveHash);
-        }
-    }, [effectiveHash, selectedTorrent]);
-
-    const onSelectionChangeRef = useRef(onSelectionChange);
-    onSelectionChangeRef.current = onSelectionChange;
-
-    useEffect(() => {
-        onSelectionChangeRef.current(effectiveHash);
-    }, [effectiveHash]);
-
-    useInput((input, key) => {
+    useInput((_input, key) => {
         // Horizontal scroll
         const scrollXDelta = key.rightArrow ? 4 : key.leftArrow ? -4 : 0;
         if (scrollXDelta !== 0) {
@@ -183,20 +168,7 @@ export function Table({ torrents, sorting, maxRows, screenWidth, rawStatus, onSe
             const len = sorted.length;
             if (len === 0) return;
             const newIndex = Math.max(0, Math.min(len - 1, selectedIndex + delta));
-            const newHash = sorted[newIndex].hash;
-            setSelectedTorrent(newHash);
-            onSelectionChangeRef.current(newHash);
-        }
-
-        // Sort mode controls
-        if (sorting) {
-            if (key.tab) {
-                const dir = key.shift ? -1 : 1;
-                setSortColumn((prev) => (prev + dir + columns.length) % columns.length);
-            }
-            if (input === " ") {
-                setSortAscending((prev) => !prev);
-            }
+            onSelectionChange(sorted[newIndex].hash);
         }
     });
 
@@ -218,7 +190,7 @@ export function Table({ torrents, sorting, maxRows, screenWidth, rawStatus, onSe
         <Box flexDirection="column">
             <TableHeader sort_column={sortColumn} sort_ascending={sortAscending} sorting={sorting} scrollX={scrollX} screenWidth={screenWidth} widths={widths} />
             <Text>{"─".repeat(screenWidth)}</Text>
-            {visible.map((torrent) => <TableRow torrent={torrent} key={torrent.hash} selected={torrent.hash === effectiveHash} scrollX={scrollX} screenWidth={screenWidth} widths={widths} rawStatus={rawStatus} />)}
+            {visible.map((torrent) => <TableRow torrent={torrent} key={torrent.hash} selected={torrent.hash === selectedHash} scrollX={scrollX} screenWidth={screenWidth} widths={widths} rawStatus={rawStatus} />)}
         </Box>
     )
 }

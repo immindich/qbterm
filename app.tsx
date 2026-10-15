@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Box, Text, useInput, useApp, useStdout } from "ink";
 import { getMainData, stopTorrents, startTorrents, deleteTorrents, HttpError, TransferInfo, type TorrentInfo } from "./api.js";
 import { formatBytes } from "./format.js";
-import { Table } from "./table.js";
+import { Table, sortTorrents, findSelectedIndex, columnCount } from "./table.js";
 import { AddTorrentForm } from "./add-torrent-form.js";
 import { Info } from "./info.js";
 
@@ -47,6 +47,8 @@ interface AppState {
     server_state: TransferInfo;
 }
 
+const NO_TORRENTS: Record<string, TorrentInfo> = {};
+
 type Mode = "normal" | "sorting" | "add-torrent" | "info" | "confirm-delete";
 
 interface AppProps {
@@ -62,7 +64,9 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, onSessionExp
     const [errored, setErrored] = useState<boolean>(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [mode, setMode] = useState<Mode>("normal");
-    const [selectedTorrent, setSelectedTorrent] = useState<string | null>(null);
+    const [selection, setSelection] = useState<string | null>(null);
+    const [sortColumn, setSortColumn] = useState(0);
+    const [sortAscending, setSortAscending] = useState(true);
     const [deleteFiles, setDeleteFiles] = useState(false);
     const ridRef = useRef(0);
     const fetchIdRef = useRef(0);
@@ -70,6 +74,11 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, onSessionExp
     const maxRows = screenRows - 5;
 
     const { exit } = useApp();
+
+    const sorted = useMemo(() => sortTorrents(state?.torrents ?? NO_TORRENTS, sortColumn, sortAscending), [state?.torrents, sortColumn, sortAscending]);
+    // The stored selection can point at a removed torrent; the effective one falls back to the first row
+    const selectedIndex = useMemo(() => findSelectedIndex(sorted, selection), [sorted, selection]);
+    const selectedTorrent = sorted[selectedIndex]?.hash ?? null;
 
     async function fetchData() {
         const thisRequest = ++fetchIdRef.current;
@@ -183,6 +192,13 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, onSessionExp
             if (key.escape) {
                 setMode("normal");
             }
+            if (key.tab) {
+                const dir = key.shift ? -1 : 1;
+                setSortColumn((prev) => (prev + dir + columnCount) % columnCount);
+            }
+            if (input === " ") {
+                setSortAscending((prev) => !prev);
+            }
         } else if (mode === "info") {
             if (key.escape) {
                 setMode("normal");
@@ -223,7 +239,7 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, onSessionExp
                     </Box>
                     : mode === "info" && selectedTorrent
                     ? <Info url={url} name={state.torrents[selectedTorrent].name} sid={sid} hash={selectedTorrent} width={screenWidth} height={maxRows + 2} />
-                    : <Table torrents={state.torrents} sorting={mode === "sorting"} maxRows={maxRows} screenWidth={screenWidth} rawStatus={rawStatus} onSelectionChange={setSelectedTorrent} />
+                    : <Table sorted={sorted} selectedIndex={selectedIndex} sortColumn={sortColumn} sortAscending={sortAscending} sorting={mode === "sorting"} maxRows={maxRows} screenWidth={screenWidth} rawStatus={rawStatus} onSelectionChange={setSelection} />
                 }
             </Box>
             <Text>{"─".repeat(screenWidth)}</Text>

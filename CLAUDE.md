@@ -30,7 +30,7 @@ Copy `config.example.toml` to `config.toml` in the project directory and fill in
 - `main.tsx` — Entry point; config loading, auto-login, session management
 - `app.tsx` — Main application component; data polling, mode switching, keyboard handling
 - `api.ts` — qBittorrent WebUI API client and types
-- `table.tsx` — Torrent list table with sorting, scrolling, and selection
+- `table.tsx` — Torrent list table rendering and scrolling, plus column definitions and sort helpers (sort and selection state live in `app.tsx`)
 - `info.tsx` — Torrent detail view with tabs (Properties, Content, Peers)
 - `format.ts` — Display formatting utilities (bytes, duration, progress, state)
 - `add-torrent-form.tsx` — Form for adding torrents by URL
@@ -74,7 +74,7 @@ git worktree remove --force bench/tmp/old
 
 What to look for:
 - CPU should stay roughly flat as the torrent count grows. A jump between 500 and 2000 torrents usually means something is O(n²) per poll; use `bench/profile.sh` to find it.
-- For reference, after the merge fix: about 2–3% CPU at 0–2000 torrents (about 0.4–0.7 CPU-s over 20s), and about 10% while scrolling at 30 keys/s (7.7% with `NODE_ENV=production`). Scrolling cost should not depend on the torrent count; most of it is Ink redrawing the full screen on each keypress.
+- For reference, after the merge fix: about 2–3% CPU at 0–2000 torrents (about 0.4–0.7 CPU-s over 20s), and about 13% while scrolling at 30 keys/s (about 9% with `NODE_ENV=production`). Scrolling cost should not depend on the torrent count; most of it is Ink redrawing the full screen on each keypress.
 - The scripts use React's development build unless you set `NODE_ENV=production`. That cut total CPU by about a third at 2000 torrents, so compare runs with the same setting.
 - The scripts must run from inside the project, because the mise `node` shim only resolves there.
 

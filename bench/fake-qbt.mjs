@@ -1,4 +1,4 @@
-// Fake qBittorrent WebUI for benchmarking. Serves auth/login and sync/maindata with N torrents;
+// Fake qBittorrent WebUI for benchmarking. Serves auth/login, sync/maindata and torrents/delete with N torrents;
 // each poll, roughly a third of the torrents report new speeds (like a busy real client).
 // usage: node bench/fake-qbt.mjs <torrents> <port>
 import http from "http";
@@ -18,11 +18,21 @@ for (let i = 0; i < N; i++) {
 }
 
 let rid = 0;
-http.createServer((req, res) => {
+let removed = [];
+http.createServer(async (req, res) => {
     const url = new URL(req.url, "http://localhost");
     if (url.pathname === "/api/v2/auth/login") {
         res.writeHead(200, { "set-cookie": "SID=bench; path=/" });
         return res.end("Ok.");
+    }
+    if (url.pathname === "/api/v2/torrents/delete") {
+        let body = "";
+        for await (const chunk of req) body += chunk;
+        for (const hash of (new URLSearchParams(body).get("hashes") ?? "").split("|")) {
+            if (torrents[hash]) { delete torrents[hash]; removed.push(hash); }
+        }
+        res.writeHead(200);
+        return res.end("");
     }
     if (url.pathname === "/api/v2/sync/maindata") {
         const requestRid = Number(url.searchParams.get("rid") ?? 0);
@@ -40,6 +50,10 @@ http.createServer((req, res) => {
                 t.dlspeed = Math.floor(Math.random() * 1e6);
                 t.upspeed = Math.floor(Math.random() * 1e5);
                 body.torrents[hash] = { dlspeed: t.dlspeed, upspeed: t.upspeed };
+            }
+            if (removed.length) {
+                body.torrents_removed = removed;
+                removed = [];
             }
         }
         res.writeHead(200, { "content-type": "application/json" });
