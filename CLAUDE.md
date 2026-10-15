@@ -60,6 +60,8 @@ bench/terminal-output.sh 500 10 # bytes written to the terminal and number of fu
 bench/scroll.sh 10 30 500 2000  # CPU while holding an arrow key (30 keys/s) vs. idle, at 500 and 2000 torrents
 ```
 
+The scripts use a 200x50 terminal; set `BENCH_COLS`/`BENCH_ROWS` to change it. Ink redraws the whole frame on every render, so rendering cost grows with terminal size.
+
 To compare against an older commit, build it in a worktree and point the scripts at it with `QBT_MAIN`:
 
 ```bash
