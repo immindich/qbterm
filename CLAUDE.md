@@ -57,11 +57,22 @@ bench/cpu.sh                    # CPU time over 20s at 0, 500 and 2000 torrents
 bench/cpu.sh 10 100 5000        # custom duration (seconds) and torrent counts
 bench/profile.sh 2000 20        # V8 CPU profile; prints hottest functions, keeps raw profile in bench/profiles/
 bench/terminal-output.sh 500 10 # bytes written to the terminal and number of full-screen clears
+bench/scroll.sh 10 30 500 2000  # CPU while holding an arrow key (30 keys/s) vs. idle, at 500 and 2000 torrents
+```
+
+To compare against an older commit, build it in a worktree and point the scripts at it with `QBT_MAIN`:
+
+```bash
+git worktree add --detach bench/tmp/old <commit>
+ln -s ../../../node_modules bench/tmp/old/node_modules
+(cd bench/tmp/old && npx tsc)
+QBT_MAIN=$PWD/bench/tmp/old/dist/main.js bench/cpu.sh
+git worktree remove --force bench/tmp/old
 ```
 
 What to look for:
 - CPU should stay roughly flat as the torrent count grows. A jump between 500 and 2000 torrents usually means something is O(n²) per poll; use `bench/profile.sh` to find it.
-- For reference, after the merge fix: about 2–3% CPU at 0–2000 torrents (about 0.4–0.7 CPU-s over 20s).
+- For reference, after the merge fix: about 2–3% CPU at 0–2000 torrents (about 0.4–0.7 CPU-s over 20s), and about 10% while scrolling at 30 keys/s (7.7% with `NODE_ENV=production`). Scrolling cost should not depend on the torrent count; most of it is Ink redrawing the full screen on each keypress.
 - The scripts use React's development build unless you set `NODE_ENV=production`. That cut total CPU by about a third at 2000 torrents, so compare runs with the same setting.
 - The scripts must run from inside the project, because the mise `node` shim only resolves there.
 

@@ -1,9 +1,11 @@
 # Shared setup for the bench scripts. Source it; then call start <torrents> [extra node args...].
 # Starts the fake server and the TUI (in a detached 200x50 tmux session) and cleans both up on exit.
+# Set QBT_MAIN to benchmark a different build (default: dist/main.js).
 # Sets: BENCH_DIR, ROOT, SESSION, WORK (scratch dir), TUI_PID.
 set -euo pipefail
 BENCH_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(dirname "$BENCH_DIR")
+MAIN=${QBT_MAIN:-$ROOT/dist/main.js}
 PORT=$((20000 + RANDOM % 10000))
 SESSION="qbt-bench-$PORT"
 WORK="$BENCH_DIR/tmp/$PORT"   # inside the project so the mise node shim resolves
@@ -18,13 +20,13 @@ trap cleanup EXIT
 
 start() {
     local torrents=$1; shift
-    [ -f "$ROOT/dist/main.js" ] || { echo "dist/main.js not found; run npm run build" >&2; exit 1; }
+    [ -f "$MAIN" ] || { echo "$MAIN not found; run npm run build" >&2; exit 1; }
     mkdir -p "$WORK"
     printf '[connection]\nurl = "http://localhost:%s"\nusername = "bench"\npassword = "bench"\n' "$PORT" > "$WORK/config.toml"
     node "$BENCH_DIR/fake-qbt.mjs" "$torrents" "$PORT" & SERVER_PID=$!
     sleep 0.5
     tmux new-session -d -s "$SESSION" -x 200 -y 50 -c "$WORK" \
-        "NODE_ENV=${NODE_ENV:-} node $* $ROOT/dist/main.js"
+        "NODE_ENV=${NODE_ENV:-} node $* $MAIN"
     TUI_PID=$(tmux list-panes -t "$SESSION" -F '#{pane_pid}')
     sleep 3   # let it log in and process the initial full update
 }
