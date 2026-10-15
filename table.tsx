@@ -96,14 +96,16 @@ function TableHeader({ sort_column, sort_ascending, sorting, scrollX, screenWidt
 
     // In sorting mode, highlight the active column
     const parts: { text: string; active: boolean }[] = [];
-    let pos = 0;
+    let pos = 0;  // position in the full header line
+    let used = 0; // screen columns already filled
     columns.forEach((col, i) => {
         const label = col.name + (i === sort_column ? (sort_ascending ? " ▲" : " ▼") : "");
         const cell = padOrTruncate(label, widths[i]);
         const separator = i < columns.length - 1 ? " " : "";
         const chunk = cell + separator;
-        const visible = viewSlice(chunk, Math.max(0, scrollX - pos), screenWidth);
+        const visible = viewSlice(chunk, Math.max(0, scrollX - pos), screenWidth - used);
         pos += chunk.length;
+        used += visible.length;
         if (visible.length > 0) {
             parts.push({ text: visible, active: i === sort_column });
         }

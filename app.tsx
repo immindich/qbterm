@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useMemo } from "react";
-import { Box, Text, useInput, useApp, useStdout } from "ink";
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
+import { Box, Text, useInput, useApp, useStdout, measureElement, type DOMElement } from "ink";
 import { getMainData, stopTorrents, startTorrents, deleteTorrents, HttpError, TransferInfo, type TorrentInfo } from "./api.js";
 import { formatBytes } from "./format.js";
 import { Table, sortTorrents, findSelectedIndex, columnCount } from "./table.js";
@@ -71,7 +71,19 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, onSessionExp
     const ridRef = useRef(0);
     const fetchIdRef = useRef(0);
     const { columns: screenWidth, rows: screenRows } = useTerminalSize();
-    const maxRows = screenRows - 5;
+
+    // The content area gets whatever height the footer leaves (the help bar and error
+    // messages can wrap), so measure it after layout rather than assuming a footer height.
+    const contentRef = useRef<DOMElement>(null);
+    const [measuredContentHeight, setMeasuredContentHeight] = useState<number | null>(null);
+    useLayoutEffect(() => {
+        if (!contentRef.current) return;
+        const { height } = measureElement(contentRef.current);
+        if (height !== measuredContentHeight) setMeasuredContentHeight(height);
+    });
+    // Until the first measurement, assume a three-line footer
+    const contentHeight = measuredContentHeight ?? screenRows - 3;
+    const maxRows = contentHeight - 2; // table header and separator
 
     const { exit } = useApp();
 
@@ -229,7 +241,7 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, onSessionExp
 
     return (
         <Box width={screenWidth} height={screenRows} flexDirection="column">
-            <Box flexGrow={1} flexDirection="column">
+            <Box ref={contentRef} flexGrow={1} flexShrink={1} flexBasis={0} flexDirection="column">
                 {mode === "add-torrent"
                     ? <AddTorrentForm serverUrl={url} sid={sid} defaultSavePath={defaultSavePath} onClose={() => setMode("normal")} />
                     : mode === "confirm-delete" && selectedTorrent && state.torrents[selectedTorrent]
@@ -238,7 +250,7 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, onSessionExp
                         <Text><Text inverse>[{deleteFiles ? "✓" : " "}]</Text> Delete content files</Text>
                     </Box>
                     : mode === "info" && selectedTorrent
-                    ? <Info url={url} name={state.torrents[selectedTorrent].name} sid={sid} hash={selectedTorrent} width={screenWidth} height={maxRows + 2} />
+                    ? <Info url={url} name={state.torrents[selectedTorrent].name} sid={sid} hash={selectedTorrent} width={screenWidth} height={contentHeight} />
                     : <Table sorted={sorted} selectedIndex={selectedIndex} sortColumn={sortColumn} sortAscending={sortAscending} sorting={mode === "sorting"} maxRows={maxRows} screenWidth={screenWidth} rawStatus={rawStatus} onSelectionChange={setSelection} />
                 }
             </Box>
