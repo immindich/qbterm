@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Box, Text, useInput, useApp, useStdout } from "ink";
 import { getMainData, stopTorrents, startTorrents, deleteTorrents, HttpError, TransferInfo, type TorrentInfo } from "./api.js";
 import { formatBytes } from "./format.js";
-import { Table, setRawStatus } from "./table.js";
+import { Table } from "./table.js";
 import { AddTorrentForm } from "./add-torrent-form.js";
 import { Info } from "./info.js";
 
@@ -57,8 +57,7 @@ interface AppProps {
     onSessionExpired: () => void;
 }
 
-export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp, onSessionExpired }: AppProps) {
-    setRawStatus(rawStatusProp ?? false);
+export function App({ url, sid, defaultSavePath, rawStatus = false, onSessionExpired }: AppProps) {
     const [state, setState] = useState<AppState | null>(null);
     const [errored, setErrored] = useState<boolean>(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -224,7 +223,7 @@ export function App({ url, sid, defaultSavePath, rawStatus: rawStatusProp, onSes
                     </Box>
                     : mode === "info" && selectedTorrent
                     ? <Info url={url} name={state.torrents[selectedTorrent].name} sid={sid} hash={selectedTorrent} width={screenWidth} height={maxRows + 2} />
-                    : <Table torrents={state.torrents} sorting={mode === "sorting"} maxRows={maxRows} screenWidth={screenWidth} onSelectionChange={setSelectedTorrent} />
+                    : <Table torrents={state.torrents} sorting={mode === "sorting"} maxRows={maxRows} screenWidth={screenWidth} rawStatus={rawStatus} onSelectionChange={setSelectedTorrent} />
                 }
             </Box>
             <Text>{"─".repeat(screenWidth)}</Text>

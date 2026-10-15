@@ -12,17 +12,15 @@ interface Column {
     name: string;
     key: keyof TorrentInfo;
     width: number | { min: number };
-    render: (torrent: TorrentInfo) => string;
+    render: (torrent: TorrentInfo, rawStatus: boolean) => string;
     sort: ((a: TorrentInfo, b: TorrentInfo) => number) | null;
 }
-
-let rawStatus = false;
 
 const columns: Column[] = [
     { name: "Name", key: "name", width: 20, render: (t) => stateIcon(t.state) + " " + t.name, sort: (a, b) => a.name.localeCompare(b.name) },
     { name: "Size", key: "size", width: 7, render: (t) => formatBytes(t.size), sort: null },
     { name: "Progress", key: "progress", width: 8, render: (t) => formatProgress(t.progress), sort: null },
-    { name: "Status", key: "state", width: { min: 11 }, render: (t) => rawStatus ? t.state : stateText(t.state), sort: null },
+    { name: "Status", key: "state", width: { min: 11 }, render: (t, rawStatus) => rawStatus ? t.state : stateText(t.state), sort: null },
     { name: "Down", key: "dlspeed", width: 9, render: (t) => formatBytes(t.dlspeed) + "/s", sort: null },
     { name: "Up", key: "upspeed", width: 9, render: (t) => formatBytes(t.upspeed) + "/s", sort: null },
     { name: "Seeds", key: "num_seeds", width: 5, render: (t) => t.num_seeds.toString(), sort: null },
@@ -41,16 +39,12 @@ const columns: Column[] = [
     }, sort: null },
 ];
 
-export function setRawStatus(value: boolean) {
-    rawStatus = value;
-}
-
-function resolveWidths(torrents: TorrentInfo[]): number[] {
+function resolveWidths(torrents: TorrentInfo[], rawStatus: boolean): number[] {
     return columns.map((col) => {
         if (typeof col.width === "number") return col.width;
         let max = col.width.min;
         for (const t of torrents) {
-            const len = col.render(t).length;
+            const len = col.render(t, rawStatus).length;
             if (len > max) max = len;
         }
         return Math.max(max, col.name.length + 2); // +2 for sort indicator
@@ -71,10 +65,11 @@ interface TableRowProps {
     scrollX: number;
     screenWidth: number;
     widths: number[];
+    rawStatus: boolean;
 }
 
-const TableRow = memo(function TableRow({ torrent, selected, scrollX, screenWidth, widths }: TableRowProps) {
-    const line = columns.map((col, i) => padOrTruncate(col.render(torrent), widths[i])).join(" ");
+const TableRow = memo(function TableRow({ torrent, selected, scrollX, screenWidth, widths, rawStatus }: TableRowProps) {
+    const line = columns.map((col, i) => padOrTruncate(col.render(torrent, rawStatus), widths[i])).join(" ");
     return <Text inverse={selected}>{viewSlice(line, scrollX, screenWidth)}</Text>;
 });
 
@@ -133,10 +128,11 @@ export interface TableProps {
     sorting: boolean;
     maxRows: number;
     screenWidth: number;
+    rawStatus: boolean;
     onSelectionChange: (hash: string | null) => void;
 }
 
-export function Table({ torrents, sorting, maxRows, screenWidth, onSelectionChange }: TableProps) {
+export function Table({ torrents, sorting, maxRows, screenWidth, rawStatus, onSelectionChange }: TableProps) {
     const scrollOffsetRef = useRef(0);
     const [scrollX, setScrollX] = useState(0);
     const [sortColumn, setSortColumn] = useState(0);
@@ -144,7 +140,7 @@ export function Table({ torrents, sorting, maxRows, screenWidth, onSelectionChan
     const [selectedTorrent, setSelectedTorrent] = useState<string | null>(null);
 
     const sorted = useMemo(() => sortTorrents(torrents, sortColumn, sortAscending), [torrents, sortColumn, sortAscending]);
-    const widths = useMemo(() => resolveWidths(sorted), [sorted]);
+    const widths = useMemo(() => resolveWidths(sorted, rawStatus), [sorted, rawStatus]);
     const tableWidth = useMemo(() => computeTableWidth(widths), [widths]);
 
     // Preserve selection when data changes; fall back to first item if selected was removed
@@ -222,7 +218,7 @@ export function Table({ torrents, sorting, maxRows, screenWidth, onSelectionChan
         <Box flexDirection="column">
             <TableHeader sort_column={sortColumn} sort_ascending={sortAscending} sorting={sorting} scrollX={scrollX} screenWidth={screenWidth} widths={widths} />
             <Text>{"─".repeat(screenWidth)}</Text>
-            {visible.map((torrent) => <TableRow torrent={torrent} key={torrent.hash} selected={torrent.hash === effectiveHash} scrollX={scrollX} screenWidth={screenWidth} widths={widths} />)}
+            {visible.map((torrent) => <TableRow torrent={torrent} key={torrent.hash} selected={torrent.hash === effectiveHash} scrollX={scrollX} screenWidth={screenWidth} widths={widths} rawStatus={rawStatus} />)}
         </Box>
     )
 }
