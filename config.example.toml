@@ -5,6 +5,7 @@ password = "adminadmin"
 
 # [ui]
 # help_bar = false  # hide the key help line at the bottom (the status bar stays)
+# split_info = false  # always open torrent info full-screen, instead of beside or below the list when the terminal is big enough
 
 # [debug]
 # raw_status = true

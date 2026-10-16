@@ -15,6 +15,7 @@ interface Config {
     };
     ui?: {
         help_bar?: boolean;
+        split_info?: boolean;
     };
     debug?: {
         raw_status?: boolean;
@@ -43,9 +44,10 @@ interface RootProps {
     defaultPassword?: string;
     rawStatus?: boolean;
     showHelpBar?: boolean;
+    splitInfo?: boolean;
 }
 
-function Root({ defaultUrl, defaultUsername, defaultPassword, rawStatus, showHelpBar }: RootProps) {
+function Root({ defaultUrl, defaultUsername, defaultPassword, rawStatus, showHelpBar, splitInfo }: RootProps) {
     const [session, setSession] = useState<{ url: string; sid: string; defaultSavePath: string } | null>(null);
     const [credentials, setCredentials] = useState<{ url: string; username: string; password: string } | null>(null);
     const [autoLoginFailed, setAutoLoginFailed] = useState(false);
@@ -90,7 +92,7 @@ function Root({ defaultUrl, defaultUsername, defaultPassword, rawStatus, showHel
         return <Login defaultUrl={defaultUrl} defaultUsername={defaultUsername} message={loginMessage ?? undefined} onLogin={handleLogin} />;
     }
 
-    return <App url={session.url} sid={session.sid} defaultSavePath={session.defaultSavePath} rawStatus={rawStatus} showHelpBar={showHelpBar} onSessionExpired={handleSessionExpired} />;
+    return <App url={session.url} sid={session.sid} defaultSavePath={session.defaultSavePath} rawStatus={rawStatus} showHelpBar={showHelpBar} splitInfo={splitInfo} onSessionExpired={handleSessionExpired} />;
 }
 
 const config = loadConfig();
@@ -100,4 +102,4 @@ if (config.debug?.log) {
     enableDebugLog();
 }
 
-render(<Root defaultUrl={conn?.url} defaultUsername={conn?.username} defaultPassword={conn?.password} rawStatus={config.debug?.raw_status} showHelpBar={config.ui?.help_bar} />);
+render(<Root defaultUrl={conn?.url} defaultUsername={conn?.username} defaultPassword={conn?.password} rawStatus={config.debug?.raw_status} showHelpBar={config.ui?.help_bar} splitInfo={config.ui?.split_info} />);

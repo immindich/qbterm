@@ -46,7 +46,7 @@ Copy `config.example.toml` to `config.toml` in the project directory and fill in
 
 ## Architecture
 
-The app uses a mode system (`normal`, `sorting`, `search`, `add-torrent`, `info`, `confirm-delete`) managed in `app.tsx`. The search query is separate from the mode: `search` mode is only for editing it, and the filter stays applied in the other modes. `App` derives the visible list as torrents → filter → sort → selection. Data is fetched via incremental polling (`getMainData` with RID) every 1s. The info view has its own tab system with `usePolling` for per-mode data fetching at 5s intervals.
+The app uses a mode system (`normal`, `sorting`, `search`, `add-torrent`, `info`, `confirm-delete`) managed in `app.tsx`. The search query is separate from the mode: `search` mode is only for editing it, and the filter stays applied in the other modes. `App` derives the visible list as torrents → filter → sort → selection. Data is fetched via incremental polling (`getMainData` with RID) every 1s. The info view has its own tab system with `usePolling` for per-mode data fetching at 5s intervals. When the terminal is big enough, `info` mode shows the info view as a pane beside the table (if the terminal is wide enough for both), otherwise below it (if tall enough), otherwise full-screen. While split, the table keeps handling navigation and the pane follows the selection. The table stays at the same place in the tree so it isn't remounted when the pane opens. The selected info tab lives in `App` so it survives layout changes. `[ui] split_info = false` forces full-screen.
 
 Table columns support fixed widths (`width: number`) or variable widths (`width: { min: number }`) that grow to fit content.
 
@@ -80,6 +80,7 @@ git worktree remove --force bench/tmp/old
 What to look for:
 - CPU should stay roughly flat as the torrent count grows. A jump between 500 and 2000 torrents usually means something is O(n²) per poll; use `bench/profile.sh` to find it.
 - For reference, after the merge fix: about 2–3% CPU at 0–2000 torrents (about 0.4–0.7 CPU-s over 20s), and about 13% while scrolling at 30 keys/s (about 9% with `NODE_ENV=production`). Scrolling cost should not depend on the torrent count; most of it is Ink redrawing the full screen on each keypress.
+- Avoid `overflow="hidden"` around the table: Ink clips every line written inside it, which added about 20% to scrolling CPU. The table already limits itself to `maxRows` and `screenWidth`.
 - The scripts use React's development build unless you set `NODE_ENV=production`. That cut total CPU by about a third at 2000 torrents, so compare runs with the same setting.
 - The scripts must run from inside the project, because the mise `node` shim only resolves there.
 

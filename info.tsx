@@ -9,6 +9,8 @@ function usePolling<T>(fetcher: () => Promise<T>, deps: unknown[], interval: num
 
     useEffect(() => {
         let active = true;
+        // Don't keep showing the previous torrent's data (the split view's pane follows the selection)
+        setData(null);
 
         function poll() {
             stableFetcher().then((result) => {
@@ -196,15 +198,16 @@ interface InfoProps {
     hash: string;
     width: number;
     height: number;
+    // The selected tab lives in App, so it survives switching between the split and full-screen layouts
+    mode: number;
+    onModeChange: (mode: number) => void;
 }
 
-export function Info({ url, name, sid, hash, width, height }: InfoProps) {
-    const [mode, setMode] = useState<number>(0);
-
+export function Info({ url, name, sid, hash, width, height, mode, onModeChange }: InfoProps) {
     useInput((input, key) => {
         if (key.tab) {
             const dir = key.shift ? -1 : 1;
-            setMode((prev) => (prev + dir + modes.length) % modes.length);
+            onModeChange((mode + dir + modes.length) % modes.length);
         }
     });
 

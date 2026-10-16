@@ -41,7 +41,7 @@ const columns: Column[] = [
 
 export const columnCount = columns.length;
 
-function resolveWidths(torrents: TorrentInfo[], rawStatus: boolean): number[] {
+export function resolveWidths(torrents: TorrentInfo[], rawStatus: boolean): number[] {
     return columns.map((col) => {
         if (typeof col.width === "number") return col.width;
         let max = col.width.min;
@@ -53,7 +53,7 @@ function resolveWidths(torrents: TorrentInfo[], rawStatus: boolean): number[] {
     });
 }
 
-function computeTableWidth(widths: number[]): number {
+export function computeTableWidth(widths: number[]): number {
     return widths.reduce((sum, w) => sum + w, 0) + (columns.length - 1);
 }
 
@@ -135,9 +135,9 @@ export function findSelectedIndex(sorted: TorrentInfo[], selected: string | null
 
 export interface TableProps {
     sorted: TorrentInfo[];
-    // Column widths are sized to fit these (all torrents, not just the filtered ones,
-    // so columns don't shift while a search is typed)
-    widthTorrents: TorrentInfo[];
+    // From resolveWidths over all torrents, not just the filtered ones, so columns
+    // don't shift while a search is typed
+    widths: number[];
     selectedIndex: number;
     sortColumn: number;
     sortAscending: boolean;
@@ -151,12 +151,14 @@ export interface TableProps {
     onSelectionChange: (hash: string) => void;
 }
 
-export function Table({ sorted, widthTorrents, selectedIndex, sortColumn, sortAscending, sorting, maxRows, screenWidth, rawStatus, textInputActive, emptyMessage, onSelectionChange }: TableProps) {
+export function Table({ sorted, widths, selectedIndex, sortColumn, sortAscending, sorting, maxRows, screenWidth, rawStatus, textInputActive, emptyMessage, onSelectionChange }: TableProps) {
     const scrollOffsetRef = useRef(0);
-    const [scrollX, setScrollX] = useState(0);
+    const [storedScrollX, setScrollX] = useState(0);
 
-    const widths = useMemo(() => resolveWidths(widthTorrents, rawStatus), [widthTorrents, rawStatus]);
     const tableWidth = useMemo(() => computeTableWidth(widths), [widths]);
+    // The table can get wider than its content (the terminal grows, or the info pane opens beside it)
+    const maxScrollX = Math.max(0, tableWidth - screenWidth);
+    const scrollX = Math.min(storedScrollX, maxScrollX);
 
     const selectedHash = sorted[selectedIndex]?.hash ?? null;
 
@@ -164,10 +166,7 @@ export function Table({ sorted, widthTorrents, selectedIndex, sortColumn, sortAs
         // Horizontal scroll
         const scrollXDelta = textInputActive ? 0 : key.rightArrow ? 4 : key.leftArrow ? -4 : 0;
         if (scrollXDelta !== 0) {
-            setScrollX((prev) => {
-                const maxScrollX = Math.max(0, tableWidth - screenWidth);
-                return Math.max(0, Math.min(maxScrollX, prev + scrollXDelta));
-            });
+            setScrollX((prev) => Math.max(0, Math.min(maxScrollX, Math.min(prev, maxScrollX) + scrollXDelta)));
         }
 
         // Navigation

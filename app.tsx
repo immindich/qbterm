@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { Box, Text, useInput, useApp, useStdout, measureElement, type DOMElement } from "ink";
 import { getMainData, stopTorrents, startTorrents, deleteTorrents, HttpError, TransferInfo, type TorrentInfo } from "./api.js";
 import { formatBytes } from "./format.js";
-import { Table, sortTorrents, findSelectedIndex, columnCount } from "./table.js";
+import { Table, sortTorrents, findSelectedIndex, columnCount, resolveWidths, computeTableWidth } from "./table.js";
 import { SearchBar } from "./search-bar.js";
 import { parseQuery, filterTorrents } from "./search.js";
 import { AddTorrentForm } from "./add-torrent-form.js";
@@ -53,16 +53,22 @@ const NO_TORRENTS: Record<string, TorrentInfo> = {};
 
 type Mode = "normal" | "sorting" | "search" | "add-torrent" | "info" | "confirm-delete";
 
+// The info view opens beside the table if the info pane can be at least this wide,
+// otherwise below it if the content area is at least this tall, otherwise full-screen
+const MIN_INFO_WIDTH = 50;
+const MIN_STACKED_SPLIT_HEIGHT = 30;
+
 interface AppProps {
     url: string;
     sid: string;
     defaultSavePath: string;
     rawStatus?: boolean;
     showHelpBar?: boolean;
+    splitInfo?: boolean;
     onSessionExpired: () => void;
 }
 
-export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar = true, onSessionExpired }: AppProps) {
+export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar = true, splitInfo = true, onSessionExpired }: AppProps) {
     const [state, setState] = useState<AppState | null>(null);
     const [errored, setErrored] = useState<boolean>(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -76,6 +82,7 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
     const [queryBeforeEdit, setQueryBeforeEdit] = useState("");
     const [deleteFiles, setDeleteFiles] = useState(false);
     const [choosingFile, setChoosingFile] = useState(false);
+    const [infoMode, setInfoMode] = useState(0);
     const ridRef = useRef(0);
     const fetchIdRef = useRef(0);
     const { columns: screenWidth, rows: screenRows } = useTerminalSize();
@@ -91,7 +98,6 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
     });
     // Until the first measurement, assume the footer doesn't wrap (separator, status bar, help bar)
     const contentHeight = measuredContentHeight ?? screenRows - (showHelpBar ? 3 : 2);
-    const maxRows = contentHeight - 2; // table header and separator
 
     const { exit } = useApp();
 
@@ -103,6 +109,20 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
     // The stored selection can point at a removed torrent; the effective one falls back to the first row
     const selectedIndex = useMemo(() => findSelectedIndex(sorted, selection), [sorted, selection]);
     const selectedTorrent = sorted[selectedIndex]?.hash ?? null;
+    const widths = useMemo(() => resolveWidths(allTorrents, rawStatus), [allTorrents, rawStatus]);
+    const tableWidth = useMemo(() => computeTableWidth(widths), [widths]);
+
+    const infoLayout = !splitInfo ? "full"
+        : screenWidth >= tableWidth + 1 + MIN_INFO_WIDTH ? "side"
+        : contentHeight >= MIN_STACKED_SPLIT_HEIGHT ? "stacked"
+        : "full";
+    const infoSplit = mode === "info" && selectedTorrent !== null && infoLayout !== "full";
+    const infoSide = infoSplit && infoLayout === "side";
+    const infoStacked = infoSplit && infoLayout === "stacked";
+    const infoHeight = infoStacked ? Math.floor((contentHeight - 1) / 2) : contentHeight;
+    const tableHeight = infoStacked ? contentHeight - 1 - infoHeight : contentHeight; // 1 for the separator
+    const tableScreenWidth = infoSide ? tableWidth : screenWidth;
+    const maxRows = tableHeight - 2; // table header and separator
 
     async function fetchData() {
         const thisRequest = ++fetchIdRef.current;
@@ -178,6 +198,7 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
             }
 
             if (key.return && selectedTorrent !== null) {
+                setInfoMode(0);
                 setMode("info");
             }
 
@@ -268,6 +289,8 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
         ? [["type", "filter"], ["↑↓", "navigate"], ["Enter", "open/choose"], ["/", "open folder"], ["←", "parent folder"], ["~", "home"], ["Esc", "back"]]
         : mode === "add-torrent"
         ? [["Tab", "switch field"], ["Enter", "add"], ["Esc", "close"]]
+        : mode === "info" && infoSplit
+        ? [["↑↓", "select torrent"], ["Tab", "switch tab"], ["Esc", "close"]]
         : mode === "info"
         ? [["Tab", "switch tab"], ["Esc", "back"]]
         : mode === "confirm-delete"
@@ -278,11 +301,11 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
             ["/", filterActive ? "edit search" : "search"], ...(filterActive ? [["Esc", "clear filter"] as [string, string]] : []),
             ["s", "sort"], ["t", "add torrent"], ["p", "pause/resume"], ["d", "delete"], ["q", "quit"]];
 
-    const showSearchBar = mode === "search" || (filterActive && (mode === "normal" || mode === "sorting"));
+    const showSearchBar = mode === "search" || (filterActive && (mode === "normal" || mode === "sorting" || infoSplit));
 
     return (
         <Box width={screenWidth} height={screenRows} flexDirection="column">
-            <Box ref={contentRef} flexGrow={1} flexShrink={1} flexBasis={0} flexDirection="column">
+            <Box ref={contentRef} flexGrow={1} flexShrink={1} flexBasis={0} flexDirection={infoSide ? "row" : "column"}>
                 {mode === "add-torrent"
                     ? <AddTorrentForm serverUrl={url} sid={sid} defaultSavePath={defaultSavePath} width={screenWidth} height={contentHeight}
                         choosingFile={choosingFile} onChoosingFileChange={setChoosingFile} onClose={() => setMode("normal")} />
@@ -291,11 +314,26 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
                         <Text>Delete &quot;{state.torrents[selectedTorrent].name}&quot;?</Text>
                         <Text><Text inverse>[{deleteFiles ? "✓" : " "}]</Text> Delete content files</Text>
                     </Box>
-                    : mode === "info" && selectedTorrent
-                    ? <Info url={url} name={state.torrents[selectedTorrent].name} sid={sid} hash={selectedTorrent} width={screenWidth} height={contentHeight} />
-                    : <Table sorted={sorted} widthTorrents={allTorrents} selectedIndex={selectedIndex} sortColumn={sortColumn} sortAscending={sortAscending}
-                        sorting={mode === "sorting"} maxRows={maxRows} screenWidth={screenWidth} rawStatus={rawStatus} textInputActive={mode === "search"}
-                        emptyMessage={filterActive ? `No torrents match "${query.trim()}"` : undefined} onSelectionChange={setSelection} />
+                    : mode === "info" && selectedTorrent && !infoSplit
+                    ? <Info url={url} name={state.torrents[selectedTorrent].name} sid={sid} hash={selectedTorrent} width={screenWidth} height={contentHeight}
+                        mode={infoMode} onModeChange={setInfoMode} />
+                    // Keep the table at the same place in the tree with or without the info pane,
+                    // so opening and closing the pane doesn't reset its scroll position
+                    : <>
+                        <Box flexDirection="column" flexShrink={0} width={tableScreenWidth} height={tableHeight}>
+                            <Table sorted={sorted} widths={widths} selectedIndex={selectedIndex} sortColumn={sortColumn} sortAscending={sortAscending}
+                                sorting={mode === "sorting"} maxRows={maxRows} screenWidth={tableScreenWidth} rawStatus={rawStatus} textInputActive={mode === "search"}
+                                emptyMessage={filterActive ? `No torrents match "${query.trim()}"` : undefined} onSelectionChange={setSelection} />
+                        </Box>
+                        {/* The divider is text rather than a Box border: Ink only applies the changed style
+                            props on update, so switching borderStyle on would turn on all four edges in the layout */}
+                        {infoSplit && <Text>{infoSide ? Array(contentHeight).fill("│").join("\n") : "─".repeat(screenWidth)}</Text>}
+                        {infoSplit && selectedTorrent &&
+                            <Info url={url} name={state.torrents[selectedTorrent].name} sid={sid} hash={selectedTorrent}
+                                width={infoSide ? screenWidth - tableWidth - 1 : screenWidth} height={infoHeight}
+                                mode={infoMode} onModeChange={setInfoMode} />
+                        }
+                    </>
                 }
             </Box>
             <Text>{"─".repeat(screenWidth)}</Text>
