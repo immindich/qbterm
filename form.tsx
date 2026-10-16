@@ -18,7 +18,21 @@ interface CheckboxFormField {
     onChange: (value: boolean) => void;
 }
 
-export type FormField = TextFormField | CheckboxFormField;
+interface ButtonFormField {
+    type: "button";
+    label: string;
+    onPress: () => void;
+}
+
+export type FormField = TextFormField | CheckboxFormField | ButtonFormField;
+
+function Button({ label, focus, onPress }: { label: string; focus: boolean; onPress: () => void }) {
+    useInput((input, key) => {
+        if (key.return || input === " ") onPress();
+    }, { isActive: focus });
+
+    return <Text inverse={focus}>[ {label} ]</Text>;
+}
 
 interface FormProps {
     title: string;
@@ -29,7 +43,8 @@ interface FormProps {
 
 export function Form({ title, fields, onSubmit, initialFocusIndex = 0 }: FormProps) {
     const [focusIndex, setFocusIndex] = useState(initialFocusIndex);
-    const maxLabel = Math.max(...fields.map((f) => f.label.length));
+    // Buttons show their label on the button, not in the label column
+    const maxLabel = Math.max(...fields.map((f) => f.type === "button" ? 0 : f.label.length));
 
     useInput((_input, key) => {
         if (key.tab) {
@@ -44,8 +59,13 @@ export function Form({ title, fields, onSubmit, initialFocusIndex = 0 }: FormPro
             <Box flexDirection="column">
                 {fields.map((field, i) => (
                     <Box flexDirection="row" gap={1} key={field.label}>
-                        <Text>{field.label.padStart(maxLabel)}:</Text>
-                        {field.type === "checkbox" ? (
+                        {/* Long values wrap rather than squeezing the label */}
+                        <Box flexShrink={0}>
+                            <Text>{field.type === "button" ? " ".repeat(maxLabel + 1) : field.label.padStart(maxLabel) + ":"}</Text>
+                        </Box>
+                        {field.type === "button" ? (
+                            <Button label={field.label} focus={i === focusIndex} onPress={field.onPress} />
+                        ) : field.type === "checkbox" ? (
                             <Checkbox value={field.value} onChange={field.onChange} focus={i === focusIndex} onSubmit={onSubmit} />
                         ) : (
                             <TextInput

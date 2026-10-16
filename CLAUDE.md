@@ -35,9 +35,11 @@ Copy `config.example.toml` to `config.toml` in the project directory and fill in
 - `format.ts` — Display formatting utilities (bytes, duration, progress, state)
 - `search.ts` — Search matching: names and queries are compared with case, accents and separators removed; every query word must appear in the name
 - `search-bar.tsx` — Search input line and the "Filter" indicator shown while a search is applied
-- `add-torrent-form.tsx` — Form for adding torrents by URL
+- `add-torrent-form.tsx` — Form for adding torrents by URL, magnet link or local `.torrent` file (local files are read and uploaded, so they work with a remote qBittorrent)
+- `file-chooser.tsx` — Built-in file browser opened from the add-torrent form; lists folders and `.torrent` files, filtered as you type
+- `files.ts` — Path handling for the add-torrent form: telling URLs from paths, unquoting and unescaping pasted or dragged paths, listing folders for the file chooser
 - `login.tsx` — Login form
-- `form.tsx` — Reusable form component (text inputs and checkboxes)
+- `form.tsx` — Reusable form component (text inputs, checkboxes and buttons)
 - `checkbox.tsx` — Checkbox input component
 - `config.example.toml` — Example configuration file
 - `bench/` — Performance benchmarks (see Benchmarking)
@@ -50,7 +52,7 @@ Table columns support fixed widths (`width: number`) or variable widths (`width:
 
 ## Benchmarking
 
-`bench/` measures the TUI against a fake qBittorrent server (`bench/fake-qbt.mjs`) that serves N torrents, about a third of which change speed on every poll. The scripts run the built app (`dist/main.js`) in a detached tmux session and clean up after themselves.
+`bench/` measures the TUI against a fake qBittorrent server (`bench/fake-qbt.mjs`) that serves N torrents, about a third of which change speed on every poll. It also serves the info view's endpoints (properties, files, peers) with fake data that's the same on every run, so it's useful for manual testing too: `node bench/fake-qbt.mjs <torrents> <port>`. The scripts run the built app (`dist/main.js`) in a detached tmux session and clean up after themselves.
 
 When a change could affect performance (polling, the `setState` merge in `app.tsx`, sorting or rendering in `table.tsx`, anything that runs per torrent or per poll), run `npm run build`, then `bench/cpu.sh` before and after the change and compare:
 

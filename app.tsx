@@ -75,6 +75,7 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
     const [query, setQuery] = useState("");
     const [queryBeforeEdit, setQueryBeforeEdit] = useState("");
     const [deleteFiles, setDeleteFiles] = useState(false);
+    const [choosingFile, setChoosingFile] = useState(false);
     const ridRef = useRef(0);
     const fetchIdRef = useRef(0);
     const { columns: screenWidth, rows: screenRows } = useTerminalSize();
@@ -172,6 +173,7 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
             }
 
             if (input === "t") {
+                setChoosingFile(false);
                 setMode("add-torrent");
             }
 
@@ -227,7 +229,8 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
                 setMode("normal");
             }
         } else if (mode === "add-torrent") {
-            if (key.escape) {
+            // The file chooser handles its own Escape (it clears the filter first)
+            if (key.escape && !choosingFile) {
                 setMode("normal");
             }
         } else if (mode === "sorting") {
@@ -261,8 +264,10 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
 
     const helpKeys: [string, string][] = mode === "sorting"
         ? [["Tab", "column"], ["Space", "toggle order"], ["Esc", "done"]]
+        : mode === "add-torrent" && choosingFile
+        ? [["type", "filter"], ["↑↓", "navigate"], ["Enter", "open/choose"], ["/", "open folder"], ["←", "parent folder"], ["~", "home"], ["Esc", "back"]]
         : mode === "add-torrent"
-        ? [["Tab", "switch field"], ["Esc", "close"]]
+        ? [["Tab", "switch field"], ["Enter", "add"], ["Esc", "close"]]
         : mode === "info"
         ? [["Tab", "switch tab"], ["Esc", "back"]]
         : mode === "confirm-delete"
@@ -279,7 +284,8 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
         <Box width={screenWidth} height={screenRows} flexDirection="column">
             <Box ref={contentRef} flexGrow={1} flexShrink={1} flexBasis={0} flexDirection="column">
                 {mode === "add-torrent"
-                    ? <AddTorrentForm serverUrl={url} sid={sid} defaultSavePath={defaultSavePath} onClose={() => setMode("normal")} />
+                    ? <AddTorrentForm serverUrl={url} sid={sid} defaultSavePath={defaultSavePath} width={screenWidth} height={contentHeight}
+                        choosingFile={choosingFile} onChoosingFileChange={setChoosingFile} onClose={() => setMode("normal")} />
                     : mode === "confirm-delete" && selectedTorrent && state.torrents[selectedTorrent]
                     ? <Box flexDirection="column" gap={1}>
                         <Text>Delete &quot;{state.torrents[selectedTorrent].name}&quot;?</Text>

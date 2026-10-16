@@ -142,8 +142,15 @@ export async function getTorrents(
     return response.json() as Promise<TorrentInfo[]>;
 }
 
+// A .torrent file to upload
+export interface TorrentUpload {
+    name: string;
+    data: Uint8Array<ArrayBuffer>;
+}
+
 export interface AddTorrentOptions {
     urls?: string[];
+    torrents?: TorrentUpload[];
     savepath?: string;
     cookie?: string;
     category?: string;
@@ -169,6 +176,9 @@ export async function addTorrents(
     const form = new FormData();
 
     if (options.urls) form.append("urls", options.urls.join("\n"));
+    for (const file of options.torrents ?? []) {
+        form.append("torrents", new Blob([file.data], { type: "application/x-bittorrent" }), file.name);
+    }
     if (options.savepath) form.append("savepath", options.savepath);
     if (options.cookie) form.append("cookie", options.cookie);
     if (options.category) form.append("category", options.category);
@@ -191,6 +201,9 @@ export async function addTorrents(
         body: form,
     });
 
+    if (response.status === 415) {
+        throw new HttpError(response.status, "Failed to add torrent: not a valid torrent file");
+    }
     if (!response.ok) {
         throw new HttpError(response.status, `Failed to add torrent: HTTP ${response.status}`);
     }
