@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
-import { Box, Text, useInput, useApp, useStdout, measureElement, type DOMElement } from "ink";
+import { Box, Text, useInput, useApp, useWindowSize, measureElement, type DOMElement } from "ink";
 import { getMainData, stopTorrents, startTorrents, deleteTorrents, HttpError, TransferInfo, type TorrentInfo } from "./api.js";
 import { formatBytes } from "./format.js";
 import { Table, sortTorrents, findSelectedIndex, columnCount, resolveWidths, computeTableWidth } from "./table.js";
@@ -7,19 +7,6 @@ import { SearchBar } from "./search-bar.js";
 import { parseQuery, filterTorrents } from "./search.js";
 import { AddTorrentForm } from "./add-torrent-form.js";
 import { Info } from "./info.js";
-
-function useTerminalSize() {
-    const { stdout } = useStdout();
-    const [size, setSize] = useState({ columns: stdout.columns ?? 80, rows: stdout.rows ?? 24 });
-
-    useEffect(() => {
-        const onResize = () => setSize({ columns: stdout.columns ?? 80, rows: stdout.rows ?? 24 });
-        stdout.on("resize", onResize);
-        return () => { stdout.off("resize", onResize); };
-    }, [stdout]);
-
-    return size;
-}
 
 interface StatusBarProps {
     dl_info_speed: number;
@@ -85,7 +72,7 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
     const [infoMode, setInfoMode] = useState(0);
     const ridRef = useRef(0);
     const fetchIdRef = useRef(0);
-    const { columns: screenWidth, rows: screenRows } = useTerminalSize();
+    const { columns: screenWidth, rows: screenRows } = useWindowSize();
 
     // The content area gets whatever height the footer leaves (the help bar and error
     // messages can wrap), so measure it after layout rather than assuming a footer height.
@@ -120,7 +107,7 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
     const infoSide = infoSplit && infoLayout === "side";
     const infoStacked = infoSplit && infoLayout === "stacked";
     const infoHeight = infoStacked ? Math.floor((contentHeight - 1) / 2) : contentHeight;
-    const tableHeight = infoStacked ? contentHeight - 1 - infoHeight : contentHeight; // 1 for the separator
+    const tableHeight = infoStacked ? contentHeight - 1 - infoHeight : contentHeight; // 1 for the pane's top border
     const tableScreenWidth = infoSide ? tableWidth : screenWidth;
     const maxRows = tableHeight - 2; // table header and separator
 
@@ -325,13 +312,13 @@ export function App({ url, sid, defaultSavePath, rawStatus = false, showHelpBar 
                                 sorting={mode === "sorting"} maxRows={maxRows} screenWidth={tableScreenWidth} rawStatus={rawStatus} textInputActive={mode === "search"}
                                 emptyMessage={filterActive ? `No torrents match "${query.trim()}"` : undefined} onSelectionChange={setSelection} />
                         </Box>
-                        {/* The divider is text rather than a Box border: Ink only applies the changed style
-                            props on update, so switching borderStyle on would turn on all four edges in the layout */}
-                        {infoSplit && <Text>{infoSide ? Array(contentHeight).fill("│").join("\n") : "─".repeat(screenWidth)}</Text>}
+                        {/* The border is the divider: on the left beside the table, on top below it */}
                         {infoSplit && selectedTorrent &&
-                            <Info url={url} name={state.torrents[selectedTorrent].name} sid={sid} hash={selectedTorrent}
-                                width={infoSide ? screenWidth - tableWidth - 1 : screenWidth} height={infoHeight}
-                                mode={infoMode} onModeChange={setInfoMode} />
+                            <Box borderStyle="single" borderLeft={infoSide} borderTop={infoStacked} borderRight={false} borderBottom={false}>
+                                <Info url={url} name={state.torrents[selectedTorrent].name} sid={sid} hash={selectedTorrent}
+                                    width={infoSide ? screenWidth - tableWidth - 1 : screenWidth} height={infoHeight}
+                                    mode={infoMode} onModeChange={setInfoMode} />
+                            </Box>
                         }
                     </>
                 }

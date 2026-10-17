@@ -79,7 +79,7 @@ git worktree remove --force bench/tmp/old
 
 What to look for:
 - CPU should stay roughly flat as the torrent count grows. A jump between 500 and 2000 torrents usually means something is O(n²) per poll; use `bench/profile.sh` to find it.
-- For reference, after the merge fix: about 2–3% CPU at 0–2000 torrents (about 0.4–0.7 CPU-s over 20s), and about 13% while scrolling at 30 keys/s (about 9% with `NODE_ENV=production`). Scrolling cost should not depend on the torrent count; most of it is Ink redrawing the full screen on each keypress.
+- For reference, after the merge fix: about 2–3% CPU at 0–2000 torrents (about 0.4–0.7 CPU-s over 20s), and about 17% while scrolling at 30 keys/s. Scrolling cost should not depend on the torrent count; most of it is Ink redrawing the full screen on each keypress. Scrolling was about 13% on Ink 6.8. Ink 8 costs more per frame, partly because it converts every written line back to a string through `styledCharsToString` even when there's nothing to clip.
 - Avoid `overflow="hidden"` around the table: Ink clips every line written inside it, which added about 20% to scrolling CPU. The table already limits itself to `maxRows` and `screenWidth`.
 - The scripts use React's development build unless you set `NODE_ENV=production`. That cut total CPU by about a third at 2000 torrents, so compare runs with the same setting.
 - The scripts must run from inside the project, because the mise `node` shim only resolves there.
